@@ -32,6 +32,7 @@ echo "Preparing P-Net training data: landmark"
 python3 predata/gen_landmark_data.py --stage=pnet
 ### generate tfrecord file for tf training
 echo "Preparing P-Net imdb file"
+export LD_LIBRARY_PATH=/home/ulsee/often/caffe/.build_release/lib:$LD_LIBRARY_PATH
 python3 predata/gen_net_imdb.py --stage=pnet
 # ### start to training P-Net
 # echo "Start to training P-Net"

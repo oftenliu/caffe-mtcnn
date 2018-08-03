@@ -21,12 +21,11 @@ class Data_Layer_train(caffe.Layer):
 		layer_params = yaml.load(self.param_str)
 		self._batch_size = int(layer_params.get('batch_size', 256))
 		self.net_size = layer_params.get('net_size', 12)
-		self.source = layer_params.get('source', 'CSV')
-		cls_list = ''
-		cls_root = ''
+		self.source = layer_params.get('source', 'tmp/data/pnet')
 
-        self.batch_loader = BatchLoader(cls_list,roi_list,pts_list,net_side,cls_root,roi_root,pts_root)
-        top[0].reshape(self.batch_size, 3, net_side, net_side)
+
+        self.batch_loader = BatchLoader(self.net_size,self.source)
+        top[0].reshape(self.batch_size, 3, self.net_size, self.net_size)
         top[1].reshape(self.batch_size, 1)
 		top[2].reshape(self.batch_size, 4)
 		top[3].reshape(self.batch_size, 10)
@@ -39,43 +38,56 @@ class Data_Layer_train(caffe.Layer):
             im, label, roi, pts= self.batch_loader.load_next_image(loss_task)
             top[0].data[itt, ...] = im
             top[1].data[itt, ...] = label
-	    top[2].data[itt, ...] = roi
-	    top[3].data[itt, ...] = pts
+	        top[2].data[itt, ...] = roi
+	        top[3].data[itt, ...] = pts
     def backward(self, top, propagate_down, bottom):
         pass
 
 class BatchLoader(object):
-    def __init__(self,cls_list,roi_list,pts_list,net_side,cls_root,roi_root,pts_root):
+    def __init__(net_size,source):
 		self.mean = 128
-        self.im_shape = net_side
-        self.cls_root = cls_root
-		self.roi_root = roi_root
-		self.pts_root = pts_root
-		self.roi_list = []
-		self.cls_list = []
-		self.pts_list = []
-		print "Start Reading Classify Data into Memory..."
+        self.im_shape = net_size
+		self.dataset = []
+
+		print("Start Reading pnet Data into Memory...")
 		
-		fid = open('12/cls.imdb','r')
-		self.cls_list = pickle.load(fid)
+		fid = open(source,'r')
+		self.dataset = pickle.load(fid)
 		fid.close()
 
 		random.shuffle(self.cls_list)
 
 
+	def random_flip_images(image, label, landmark):
+		# mirror
+		if np.random.choice([0, 1]) > 0:
+		# random flip
+			if label == -2 or  label == 1:
+				cv2.flip(image_batch[i], 1, image_batch[i])
+
+				# pay attention: flip landmark
+			if label == -2:
+				landmark_ = landmark.reshape((-1, 2))
+				landmark_ = np.asarray([(1 - x, y) for (x, y) in landmark_])
+				landmark_[[0, 1]] = landmark_[[1, 0]]  # left eye<->right eye
+				landmark_[[3, 4]] = landmark_[[4, 3]]  # left mouth<->right mouth
+				landmark = landmark_.ravel()
+
+		return image_batch, landmark_batch
+
+
     def load_next_image(self): 
-		if self.cls_cur == len(self.cls_list):
+		if self.cls_cur == len(self.dataset):
 			self.cls_cur = 0
-			random.shuffle(self.cls_list)
-		cur_data = self.cls_list[self.cls_cur]  # Get the image index
-		im       = cur_data[0]
-		label    = cur_data[1]
-		roi      = [-1,-1,-1,-1]
-		pts	     = [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
-		if random.choice([0,1])==1:
-			im = cv2.flip(im,random.choice([-1,0,1]))
+			random.shuffle(self.dataset)
+		curdata = self.dataset[self.cls_cur]  # Get the image index
+		im       = curdata[0]
+		label    = curdata[1]
+		roi      = [curdata[2],curdata[3],curdata[4],curdata[5]]
+		landmark = [curdata[6],curdata[7],curdata[8],curdata[9],curdata[10],curdata[11],curdata[12],curdata[13],curdata[14],curdata[15]]
+		random_flip_images(im,label,landmark)
 		self.cls_cur += 1
-		return im, label, roi, pts
+		return im, label, landmark
 
 
 ################################################################################
@@ -158,3 +170,16 @@ class cls_Layer(caffe.Layer):
 	if propagate_down[1] and self.count!=0:
 	    bottom[1].diff[...]=0
 	    bottom[1].diff[self.valid_index]=top[1].diff[...]
+
+
+
+
+
+
+
+
+
+
+
+
+

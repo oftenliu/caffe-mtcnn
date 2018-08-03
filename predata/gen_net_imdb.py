@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.random as npr
-import pickle
+import  pickle
 import sys
 import cv2
 import os
@@ -28,20 +28,24 @@ def __iter_all_data(net, iterType):
             part = f.readlines()
         # keep sample ratio [neg, pos, part] = [3, 1, 1]
         base_num = min([len(neg), len(pos), len(part)])
+        base_num = 10
         if len(neg) > base_num * 3:
             neg_keep = np.random.choice(len(neg), size=base_num * 3, replace=False)
         else:
             neg_keep = np.random.choice(len(neg), size=len(neg), replace=False)
         pos_keep = np.random.choice(len(pos), size=base_num, replace=False)
         part_keep = np.random.choice(len(part), size=base_num, replace=False)
+
+
+        print("neg_keep = [%d]"%(len(neg_keep)))
         for i in pos_keep:
             yield pos[i]
         for i in neg_keep:
             yield neg[i]
         for i in part_keep:
             yield part[i]
-        for item in open(os.path.join(saveFolder, 'landmark.txt'), 'r'):
-            yield item
+        #for item in open(os.path.join(saveFolder, 'landmark.txt'), 'r'):
+         #   yield item
     elif iterType in ['pos', 'neg', 'part', 'landmark']:
         for line in open(os.path.join(saveFolder, '%s.txt'%(iterType))):
             yield line
@@ -132,7 +136,7 @@ def gen_imdb(filename,net,type,shuffling):
     if shuffling:
         np.random.shuffle(dataset)
     
-    fid = open(filename,'w')
+    fid = open(filename,'wb')
     pickle.dump(dataset, fid)
     fid.close()
 

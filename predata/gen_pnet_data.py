@@ -140,8 +140,8 @@ def gen_hard_bbox_pnet(srcDataSet, srcAnnotations):
         sys.stdout.flush()
     for f in saveFiles.values():
         f.close()
-    print('\n')
-
+    print('create pnet data success\n')
+    
 
 if __name__ == "__main__":
     gen_hard_bbox_pnet("dataset/WIDER_train/images/", "dataset/wider_face_train.txt")
