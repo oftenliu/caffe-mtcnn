@@ -143,10 +143,10 @@ class MiniBatcher(multiprocessing.Process):
         return self.db_size
 
 
-    def random_flip_image(image,bbox, landmark):
+    def random_flip_image(self,image,bbox, landmark):
       # mirror
       if np.random.choice([0, 1]) > 0:
-      # random flip
+          # random flip
 
           cv2.flip(image, 1, image)
 
@@ -161,28 +161,6 @@ class MiniBatcher(multiprocessing.Process):
 
       return image,bbox, landmark
 
-    def make_transform(self, data, bbox=None, landmark=None):
-        # gray scale
-        if np.random.rand() < cfg.GRAY_PROB:
-          gray = cv2.cvtColor(data, cv2.COLOR_BGR2GRAY)
-          data[:, :, 0] = gray
-          data[:, :, 1] = gray
-          data[:, :, 2] = gray
-        # flip
-        if np.random.rand() < cfg.FLIP_PROB:
-          data = data[:, ::-1, :]
-          if bbox is not None:
-            # [dx1 dy1 dx2 dy2] --> [-dx2 dy1 -dx1 dy2]
-            bbox[0], bbox[2] = -bbox[2], -bbox[0]
-          if landmark is not None:
-            landmark1 = landmark.reshape((-1, 2))
-            # x --> 1 - x
-            landmark1[:, 0] = 1 - landmark1[:, 0]
-            landmark1[0], landmark1[1] = landmark1[1].copy(), landmark1[0].copy()
-            landmark1[3], landmark1[4] = landmark1[4].copy(), landmark1[3].copy()
-            landmark = landmark1.reshape(-1)
-        data = data.transpose((2, 0, 1))
-        return data, bbox, landmark
 
     def run(self):
         intpu_size = self.net_size
