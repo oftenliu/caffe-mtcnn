@@ -2,10 +2,11 @@ import multiprocessing
 import cv2
 import lmdb
 import numpy as np
+import sys
 sys.path.append('/home/ulsee/often/caffe/python')
 import json
 import caffe
-
+import atexit
 
 
 class FaceDataLayer(caffe.Layer):
@@ -77,39 +78,57 @@ class FaceDataLayer(caffe.Layer):
     '''
     self.data_queue = queue
 
-  def setup(self, bottom, top):
+
+#self.data_size = [int(np.ceil(batch_size*ratio)) for ratio in data_ratio]
+def setup(self, bottom, top):
     layer_params = yaml.load(self.param_str)
-		self._batch_size = int(layer_params.get('batch_size', 256))
-		self.net_size = layer_params.get('net_size', 12)
-		self.source = layer_params.get('source', 'tmp/data/pnet')
+    self.batch_size = int(layer_params.get('batch_size', 256))
+    self.net_type = layer_params.get('net_type', 'pnet')
+    self.net_size = cfg.NET_INPUT_SIZE[self.net_type]
+    self.source = layer_params.get('source', 'tmp/data/pnet')
 
-    self.n1 = 1
-    self.n2 = 1
-    self.n3 = 1
-    self.n4 = 1
-    self.n = 4
-    self.net_input_size = cfg.NET_INPUT_SIZE[cfg.NET_TYPE]
-    self.reshape(bottom, top)
+    self.neg_size = int(np.ceil(self.batch_size * cfg.DATA_RATIO[self.net_type][0]))
+    self.pos_size = int(np.ceil(self.batch_size * cfg.DATA_RATIO[self.net_type][1]))
+    self.part_size = int(np.ceil(self.batch_size * cfg.DATA_RATIO[self.net_type][2]))
+    self.landmark_size = int(np.ceil(self.batch_size * cfg.DATA_RATIO[self.net_type][3]))
+ 
+    db_names_train = ['data/%snet_negative_train'%net_type,
+                      'data/%snet_positive_train'%net_type,
+                      'data/%snet_part_train'%net_type,
+                      'data/%snet_landmark_train'%net_type]
 
-  def reshape(self, bottom, top):
+    self.queue_train = multiprocessing.Queue(32)
+    batcher_train = MiniBatcher(db_names_train, self.batch_size, net_type)
+
+    batcher_train.set_queue(self.queue_train)
+    batcher_train.start()
+
+    def cleanup():
+        batcher_train.terminate()
+        batcher_train.join()
+    
+    atexit.register(cleanup)
+
+def reshape(self, bottom, top):
     top[0].reshape(self.n, 3, self.net_input_size, self.net_input_size)
     top[1].reshape(self.n, 4)
     top[2].reshape(self.n, 10)
     top[3].reshape(self.n)
 
-  def forward(self, bottom, top):
-    minibatch = self._get_minibacth()
-    # face data
+def forward(self, bottom, top):
+    minibatch = self.get_minibacth()
     top[0].data[...] = minibatch['data']
-    top[1].data[...] = minibatch['bbox_target']
-    top[2].data[...] = minibatch['landmark_target']
-    top[3].data[...] = minibatch['label']
+    top[1].data[...] = minibatch['label']
+    # face data
+    top[2].data[...] = minibatch['bbox_target']
+    top[3].data[...] = minibatch['landmark_target']
 
-  def backward(self, bottom, top):
+
+def backward(self, bottom, top):
     pass
 
-  def _get_minibacth(self):
-    minibatch = self.data_queue.get()
+def get_minibacth(self):
+    minibatch = self.queue_train.get()
     return minibatch
 
 
