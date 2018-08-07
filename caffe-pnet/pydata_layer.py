@@ -4,19 +4,22 @@ import lmdb
 import numpy as np
 import sys
 sys.path.append('/home/ulsee/often/caffe/python')
-import json
+import yaml
 import caffe
 import atexit
+from functools import reduce
 from config import cfg
 
-class FaceDataLayer(caffe.Layer):
+__authors__ = ['often(1992often@gmail.com)']
+
+class MtcnnDataLayer(caffe.Layer):
     '''Custom Data Layer
     LayerOutput
       top[0]: image data
       top[1]: bbox target
       top[2]: landmark target
       top[3]: face data type / label, 0 for negatives, 1 for positives
-                                      2 for part faces, 3 for landmark faces
+                                      -1 for part faces, -2 for landmark faces
 
     Howto
       layer {
@@ -33,45 +36,18 @@ class FaceDataLayer(caffe.Layer):
         }
       }
     '''
-
-    '''
-        net_type = args.net
-        self.net_type = net_type
-        input_size = cfg.NET_INPUT_SIZE[net_type]
-        db_names_train = ['data/%snet_negative_train'%net_type,
-                          'data/%snet_positive_train'%net_type,
-                          'data/%snet_part_train'%net_type,
-                          'data/%snet_landmark_train'%net_type]
-        db_names_test = ['data/%snet_negative_val'%net_type,
-                        'data/%snet_positive_val'%net_type,
-                        'data/%snet_part_val'%net_type,
-                        'data/%snet_landmark_val'%net_type]
-        base_size = args.size
-        ns = [r*base_size for r in cfg.DATA_RATIO[net_type]]
-        # batcher setup
-        batcher_train = MiniBatcher(db_names_train, ns, net_type)
-        batcher_test = MiniBatcher(db_names_test, ns, net_type)
-        # data queue setup
-        queue_train = multiprocessing.Queue(32)
-        queue_test = multiprocessing.Queue(32)
-        batcher_train.set_queue(queue_train)
-        batcher_test.set_queue(queue_test)
-        pos_ratio, part_ratio, landmark_ratio, neg_ratio = 1.0 / 6, 1.0 / 6, 1.0 / 6, 3.0 / 6
-    '''
     #self.data_size = [int(np.ceil(batch_size*ratio)) for ratio in data_ratio]
     def setup(self, bottom, top):
         layer_params = yaml.load(self.param_str)
         self.batch_size = int(layer_params.get('batch_size', 256))
         self.net_type = layer_params.get('net_type', 'pnet')
         self.net_size = cfg.NET_INPUT_SIZE[self.net_type]
-        self.source = layer_params.get('source', 'tmp/data/pnet')
-
 
     
-        db_names_train = ['tmp/data/%s/posdb'%self.net_type,
-                          'tmp/data/%s/negdb'%self.net_type,
-                          'tmp/data/%s/partdb'%self.net_type,
-                          'tmp/data/%s/landmarkdb'%self.net_type]
+        db_names_train = ['../tmp/data/%s/posdb'%self.net_type,
+                          '../tmp/data/%s/negdb'%self.net_type,
+                          '../tmp/data/%s/partdb'%self.net_type,
+                          '../tmp/data/%s/landmarkdb'%self.net_type]
 
         self.queue_train = multiprocessing.Queue(32)
         batcher_train = MiniBatcher(db_names_train, self.batch_size, self.net_type)
@@ -86,10 +62,11 @@ class FaceDataLayer(caffe.Layer):
         atexit.register(cleanup)
 
     def reshape(self, bottom, top):
-        top[0].reshape(self.n, 3, self.net_input_size, self.net_input_size)
-        top[1].reshape(self.n, 4)
-        top[2].reshape(self.n, 10)
-        top[3].reshape(self.n)
+        top[0].reshape(self.batch_size, 3, self.net_size, self.net_size) #image
+        top[1].reshape(self.batch_size) #label
+        top[2].reshape(self.batch_size, 4)  #bbox
+        top[3].reshape(self.batch_size, 10) #landmark
+
 
     def forward(self, bottom, top):
         minibatch = self.get_minibacth()
@@ -119,22 +96,25 @@ class MiniBatcher(multiprocessing.Process):
         '''
         super(MiniBatcher, self).__init__()
         self.batch_size = batch_size
-        self.start = [0 for _ in range(4)]
+        self.start_pos = [0 for _ in range(4)]
         self.net_type = net_type
         self.db_names = db_names
         self.db = [lmdb.open(db_name) for db_name in db_names]
         self.tnx = [db.begin() for db in self.db]
-        self.db_size = [int(tnx.get('size')) for tnx in self.tnx]
-        
-        self.data_size = [int(np.ceil(batch_size*ratio)) for ratio in cfg.DATA_RATIO[self.net_type]]
-
+        self.db_size = [int(tnx.get('size'.encode())) for tnx in self.tnx]
+        print("db_size[0]=%d db_size[1]=%d db_size[2]=%d db_size[3]=%d"%(self.db_size[0],self.db_size[1],self.db_size[2],self.db_size[3]))
+        data_ratio = reduce(lambda x,y:x+y,cfg.DATA_RATIO[self.net_type])
+        self.data_size = [int(np.ceil(batch_size*ratio/data_ratio)) for ratio in cfg.DATA_RATIO[self.net_type]]  #向上取整
+        self.data_size[0] = self.batch_size - self.data_size[1] - self.data_size[2] - self.data_size[3]
+        print("db_size[0]=%d db_size[1]=%d db_size[2]=%d db_size[3]=%d"%(self.db_size[0],self.db_size[1],self.db_size[2],self.db_size[3]))
+        print("data_size[0]=%d data_size[1]=%d data_size[2]=%d data_size[3]=%d"%(self.data_size[0],self.data_size[1],self.data_size[2],self.data_size[3]))
         self.net_size = cfg.NET_INPUT_SIZE[self.net_type]
 
     def __del__(self):
         for tnx in self.tnx:
-          tnx.abort()
+            tnx.abort()
         for db in self.db:
-          db.close()
+            db.close()
 
     def set_queue(self, queue):
         self.queue = queue
@@ -174,7 +154,7 @@ class MiniBatcher(multiprocessing.Process):
           landmark_target = np.zeros((batch_size, 10), dtype=np.float32)
           label = np.zeros(batch_size, dtype=np.int32)
 
-          start = self.start
+          start = self.start_pos
           end = [start[i] + self.data_size[i] for i in range(4)]
           for i in range(4):
             if end[i] > self.db_size[i]:
@@ -182,18 +162,24 @@ class MiniBatcher(multiprocessing.Process):
               start[i] = end[i]
               end[i] = start[i] + self.data_size[i]
 
+          
           idx = 0
+          #print("\n\n\n==============================\n\n\n============================\n\n\n\n")
+          #print("here start[0] = [%d], end[0] = [%d]"%(start[0],end[0]))
+          #print("\n\n\n==============================\n\n\n============================\n\n\n\n")
           # negatives
+          print("\n\n\n==============================\n\n\n============================\n\n\n\n")
           for i in range(start[0], end[0]):
             data_key = '%08d_data'%i
             label_key = '%08d_label'%i
             bbox_key = '%08d_bbox'%i
             landmark_key = '%08d_landmark'%i
 
-            data[idx] = np.fromstring(self.tnx[0].get(data_key), dtype=np.uint8).reshape(data_shape)
-            label[idx] = np.fromstring(self.tnx[0].get(label_key), dtype=np.int32)
-            bbox_target[idx] = np.fromstring(self.tnx[0].get(bbox_key), dtype=np.float32).reshape(bbox_shape)
-            landmark_target[idx] = np.fromstring(self.tnx[0].get(landmark_key), dtype=np.float32).reshape(landmark_shape)
+            data[idx] = np.fromstring(self.tnx[0].get(data_key.encode()), dtype=np.float64).reshape(data_shape)
+            label[idx] = np.fromstring(self.tnx[0].get(label_key.encode()), dtype=np.int32)
+            #print(label[idx])
+            bbox_target[idx] = np.fromstring(self.tnx[0].get(bbox_key.encode()), dtype=np.float32).reshape(bbox_shape)
+            landmark_target[idx] = np.fromstring(self.tnx[0].get(landmark_key.encode()), dtype=np.float32).reshape(landmark_shape)
             
             idx += 1
           # positives
@@ -203,11 +189,12 @@ class MiniBatcher(multiprocessing.Process):
             bbox_key = '%08d_bbox'%i
             landmark_key = '%08d_landmark'%i
 
-            data[idx] = np.fromstring(self.tnx[0].get(data_key), dtype=np.uint8).reshape(data_shape)
-            label[idx] = np.fromstring(self.tnx[0].get(label_key), dtype=np.int32)
-            bbox_target[idx] = np.fromstring(self.tnx[0].get(bbox_key), dtype=np.float32).reshape(bbox_shape)
-            landmark_target[idx] = np.fromstring(self.tnx[0].get(landmark_key), dtype=np.float32).reshape(landmark_shape)
-            data[idx],bbox_target[idx],landmark_target[idx] = random_flip_image(data[idx],bbox_target[idx],landmark_target[idx])
+            data[idx] = np.fromstring(self.tnx[1].get(data_key.encode()), dtype=np.float64).reshape(data_shape)
+            label[idx] = np.fromstring(self.tnx[1].get(label_key.encode()), dtype=np.int32)
+            #print(label[idx])
+            bbox_target[idx] = np.fromstring(self.tnx[1].get(bbox_key.encode()), dtype=np.float32).reshape(bbox_shape)
+            landmark_target[idx] = np.fromstring(self.tnx[1].get(landmark_key.encode()), dtype=np.float32).reshape(landmark_shape)
+            data[idx],bbox_target[idx],landmark_target[idx] = self.random_flip_image(data[idx],bbox_target[idx],landmark_target[idx])
             idx += 1
           # part faces
           for i in range(start[2], end[2]):
@@ -216,10 +203,11 @@ class MiniBatcher(multiprocessing.Process):
             bbox_key = '%08d_bbox'%i
             landmark_key = '%08d_landmark'%i
 
-            data[idx] = np.fromstring(self.tnx[0].get(data_key), dtype=np.uint8).reshape(data_shape)
-            label[idx] = np.fromstring(self.tnx[0].get(label_key), dtype=np.int32)
-            bbox_target[idx] = np.fromstring(self.tnx[0].get(bbox_key), dtype=np.float32).reshape(bbox_shape)
-            landmark_target[idx] = np.fromstring(self.tnx[0].get(landmark_key), dtype=np.float32).reshape(landmark_shape)
+            data[idx] = np.fromstring(self.tnx[2].get(data_key.encode()), dtype=np.float64).reshape(data_shape)
+            label[idx] = np.fromstring(self.tnx[2].get(label_key.encode()), dtype=np.int32)
+            #print(label[idx])
+            bbox_target[idx] = np.fromstring(self.tnx[2].get(bbox_key.encode()), dtype=np.float32).reshape(bbox_shape)
+            landmark_target[idx] = np.fromstring(self.tnx[2].get(landmark_key.encode()), dtype=np.float32).reshape(landmark_shape)
             idx += 1
           # landmark faces
           for i in range(start[3], end[3]):
@@ -228,17 +216,19 @@ class MiniBatcher(multiprocessing.Process):
             bbox_key = '%08d_bbox'%i
             landmark_key = '%08d_landmark'%i
 
-            data[idx] = np.fromstring(self.tnx[0].get(data_key), dtype=np.uint8).reshape(data_shape)
-            label[idx] = np.fromstring(self.tnx[0].get(label_key), dtype=np.int32)
-            bbox_target[idx] = np.fromstring(self.tnx[0].get(bbox_key), dtype=np.float32).reshape(bbox_shape)
-            landmark_target[idx] = np.fromstring(self.tnx[0].get(landmark_key), dtype=np.float32).reshape(landmark_shape)
-            data[idx],bbox_target[idx],landmark_target[idx] = random_flip_image(data[idx],bbox_target[idx],landmark_target[idx])
+            data[idx] = np.fromstring(self.tnx[3].get(data_key.encode()), dtype=np.float64).reshape(data_shape)
+            label[idx] = np.fromstring(self.tnx[3].get(label_key.encode()), dtype=np.int32)
+            #print(label[idx])
+            bbox_target[idx] = np.fromstring(self.tnx[3].get(bbox_key.encode()), dtype=np.float32).reshape(bbox_shape)
+            landmark_target[idx] = np.fromstring(self.tnx[3].get(landmark_key.encode()), dtype=np.float32).reshape(landmark_shape)
+            data[idx],bbox_target[idx],landmark_target[idx] = self.random_flip_image(data[idx],bbox_target[idx],landmark_target[idx])
             idx += 1
 
-          self.start = end
+          self.start_pos = end
 
           minibatch = {'data': data,
                       'bbox_target': bbox_target,
                       'landmark_target': landmark_target,
                       'label': label}
           self.queue.put(minibatch)
+          print("endendendendendendendendendendendend")

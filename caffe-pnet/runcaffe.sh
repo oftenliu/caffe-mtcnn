@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-export PYTHONPATH=$PYTHONPATH:/home/cmcc/caffe-master/examples/mtcnn-caffe/12net
+export PYTHONPATH=$PYTHONPATH:/home/ulsee/often/caffe-mtcnn/caffe-pnet
 
 set -e
-~/caffe-master/build/tools/caffe train \
-	 --solver=./solver.prototxt \
+/home/ulsee/often/caffe/build/tools/caffe train  \
+	 --solver=/home/ulsee/often/caffe-mtcnn/caffe-pnet/solver.prototxt  

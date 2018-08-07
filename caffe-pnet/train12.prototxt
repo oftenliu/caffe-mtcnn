@@ -3,13 +3,13 @@ layer {
   name: "PyData"
   type: "Python"
   top: "data"
-  top: "label"
-  top: "roi"
-  top: "pts"
+  top: "label_target"
+  top: "bbox_target"
+  top: "landmark_target"
   python_param {
-    module: "pythonLayer"
-    layer:  "Data_Layer_train"
-    param_str: "{\'batch_size\': 128, \'source\': \'../data/ALISC/train_cat.csv\',\'net_size\':\'12\'}
+    module: "pydata_layer"
+    layer:  "MtcnnDataLayer"
+    param_str: "{\'batch_size\': 128, \'net_type\': \'pnet\'}"
   }
 }
 layer {
@@ -113,11 +113,12 @@ layer {
   bottom: "conv3"
   top: "conv3"
 }
+
 layer {
-  name: "conv4-1"
+  name: "class_prob"
   type: "Convolution"
   bottom: "conv3"
-  top: "conv4-1"
+  top: "class_prob"
   param {
     lr_mult: 1
     decay_mult: 1
@@ -139,44 +140,14 @@ layer {
     }
   }
 }
-layer {
-  name: "cls_bridge"
-  type: "Python"
-  bottom: "conv4-1"
-  bottom: "label"
-  top: "conv4-1-valid"
-  top: "label-valid"
-  python_param {
-    module: "pythonLayer"
-    layer:  "cls_Layer_fc"
-  }
-}
-layer {
-  name: "cls_loss"
-  type: "SoftmaxWithLoss"
-  bottom: "conv4-1-valid"
-  bottom: "label-valid"
-  top: "cls_loss"
-  propagate_down: 1
-  propagate_down: 0
-  loss_weight: 1
-}
-layer {
-  name: "cls_Acc"
-  type: "Accuracy"
-  bottom: "conv4-1-valid"
-  bottom: "label-valid"
-  top: "cls_Acc"
-  include {
-    phase: TRAIN
-  }
-}
+
+
 
 layer {
-  name: "conv4-2"
+  name: "bbox_pred"
   type: "Convolution"
   bottom: "conv3"
-  top: "conv4-2"
+  top: "bbox_pred"
   param {
     lr_mult: 1
     decay_mult: 1
@@ -198,23 +169,12 @@ layer {
     }
   }
 }
+
 layer {
-  name: "roi_loss"
-  type: "Python"
-  bottom: "conv4-2"
-  bottom: "roi"
-  top: "roi_loss"
-  loss_weight: 0.5
-  python_param {
-    module: "pythonLayer"
-    layer:  "regression_Layer"
-  }
-}
-layer {
-  name: "conv4-3"
+  name: "landmark_pred"
   type: "Convolution"
   bottom: "conv3"
-  top: "conv4-3"
+  top: "landmark_pred"
   param {
     lr_mult: 1
     decay_mult: 1
@@ -236,42 +196,29 @@ layer {
     }
   }
 }
+
+
 layer {
-  name: "pts_loss"
-  type: "Python"
-  bottom: "conv4-3"
-  bottom: "pts"
-  top: "pts_loss"
+  name: "loss"
+  type: "OftenMtcnnLoss"
+  bottom: "class_prob"
+  bottom: "bbox_pred"
+  bottom: "landmark_pred"
+  bottom: "bbox_target"
+  bottom: "landmark_target"
+  bottom: "label_target"
+  top: "cls_loss"
+  top: "bbox_loss"
+  top: "landmark_loss"
+  top: "cls_neg_acc"
+  top: "cls_pos_acc"
+  loss_weight: 1.0
   loss_weight: 0.5
-  python_param {
-    module: "pythonLayer"
-    layer:  "regression_Layer"
+  loss_weight: 0.5
+  loss_weight: 0
+  loss_weight: 0
+  mtcnn_loss_param {
+    drop_loss_rate: 0.3
   }
 }
-
-
-
-
-
-
-
-
-
-layer {
-  type: 'Python'
-  name: 'loss'
-  top: 'loss'
-  bottom: 'ipx'
-  bottom: 'ipy'
-  python_param {
-    # the module name -- usually the filename -- that needs to be in $PYTHONPATH
-    module: 'pyloss'
-    # the layer name -- the class name in the module
-    layer: 'EuclideanLossLayer'
-  }
-  # set loss weight so Caffe knows this is a loss layer
-  loss_weight: 1
-}
-
-
 

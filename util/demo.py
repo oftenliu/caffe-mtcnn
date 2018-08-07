@@ -12,10 +12,7 @@
 
 
 import numpy as np
+import cv2
 
-
-area = 1
-box_area= np.array([7,8,9,10])
-inter = np.array([1,2,3,4])
-ovr = inter * 1.0 / (box_area + area - inter)
-print(ovr)
+image = cv2.imread(filename)
+cv2.flip(image, 1, image)

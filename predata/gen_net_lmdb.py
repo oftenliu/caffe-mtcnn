@@ -53,6 +53,8 @@ def process_image_withoutcoder(filename):
 
     height = image.shape[2]
     width = image.shape[1]
+
+
     image = image.tostring()
     return image, height, width
 
@@ -103,10 +105,10 @@ def put_db(txn, dataset):
     '''
     for data in dataset:
         data_key = '%08d_data'%data[0]
-        txn.put(data_key.encode('ascii'), data[1])
+        txn.put(data_key.encode(), data[1])
 
         label_key = '%08d_label'%data[0]
-        txn.put(label_key.encode(), data[2].encode())
+        txn.put(label_key.encode(), data[2])
 
 
         bbox_key = '%08d_bbox'%data[0]
@@ -131,9 +133,11 @@ def write_db(dbname,net, iterType,shuffling):
         landmark = [bbox['xlefteye'], bbox['ylefteye'], bbox['xrighteye'], bbox['yrighteye'], bbox['xnose'], bbox['ynose'],
                    bbox['xleftmouth'], bbox['yleftmouth'], bbox['xrightmouth'], bbox['yrightmouth']]
 
-        class_label = str(class_label) 
-
-        roi = np.asarray(roi, dtype=float)
+        class_label = np.asarray(class_label, dtype=np.int32)
+        print(class_label)
+        class_label = class_label.tostring()
+        print(class_label)
+        roi = np.asarray(roi, dtype=np.float32)
         roi = roi.tostring()  # float32
         landmark = np.asarray(landmark, dtype=float)
         landmark = landmark.astype(np.float32).tostring()  # float32
@@ -149,6 +153,7 @@ def write_db(dbname,net, iterType,shuffling):
             txn.commit()
             txn = db.begin(write = True)
             dataset = []
+            break
             #logger.info('Processed [%d] files.'%i)
             #print('Processed [%d] files.'%i)
     if i % 1000 != 0:
