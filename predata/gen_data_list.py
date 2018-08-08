@@ -22,6 +22,8 @@ def start(net,shuffling=False):
 		neg = f.readlines()
 	with open(os.path.join(saveFolder, 'part.txt'), 'r') as f:
 		part = f.readlines()
+	with open(os.path.join(saveFolder, 'landmark.txt'), 'r') as f:
+		landmark = f.readlines()	
 
 	base_num = min([len(neg), len(pos), len(part)])
 	if len(neg) > base_num * 3:
@@ -38,7 +40,8 @@ def start(net,shuffling=False):
 	    dataset.append(neg[i])
 	for i in part_keep:
 		dataset.append(part[i])
-
+	for data in landmark:
+		dataset.append(data)
 
 	if shuffling:
 		np.random.shuffle(dataset)

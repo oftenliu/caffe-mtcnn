@@ -134,9 +134,9 @@ def write_db(dbname,net, iterType,shuffling):
                    bbox['xleftmouth'], bbox['yleftmouth'], bbox['xrightmouth'], bbox['yrightmouth']]
 
         class_label = np.asarray(class_label, dtype=np.int32)
-        print(class_label)
+        #print(class_label)
         class_label = class_label.tostring()
-        print(class_label)
+        #print(class_label)
         roi = np.asarray(roi, dtype=np.float32)
         roi = roi.tostring()  # float32
         landmark = np.asarray(landmark, dtype=float)
@@ -153,7 +153,6 @@ def write_db(dbname,net, iterType,shuffling):
             txn.commit()
             txn = db.begin(write = True)
             dataset = []
-            break
             #logger.info('Processed [%d] files.'%i)
             #print('Processed [%d] files.'%i)
     if i % 1000 != 0:
