@@ -1,6 +1,6 @@
-net : "train12.prototxt"
+net : "train_pnet.prototxt"
 # The base learning rate, momentum and the weight decay of the network. 984050
-base_lr: 0.001
+base_lr: 0.0001
 momentum: 0.9
 weight_decay: 0.004
 # The learning rate policy
@@ -14,3 +14,4 @@ max_iter: 200000
 snapshot: 10000
 snapshot_prefix: "../tmp/model/pnet"
 solver_mode: CPU
+

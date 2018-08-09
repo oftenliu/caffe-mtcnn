@@ -49,7 +49,7 @@ def process_image_withoutcoder(filename):
     assert len(image.shape) == 3
     assert image.shape[2] == 3
     image = np.swapaxes(image, 0, 2) #python读取的图片文件格式为H×W×K，需转化为K×H×W  batch_size*channel*H*W  
-    image = (image - 127.5)/127.5
+    #image = (image - 127.5)/127.5
 
     height = image.shape[2]
     width = image.shape[1]

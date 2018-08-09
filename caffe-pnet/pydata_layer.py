@@ -175,7 +175,7 @@ class MiniBatcher(multiprocessing.Process):
                 bbox_key = '%08d_bbox'%i
                 landmark_key = '%08d_landmark'%i
 
-                data[idx] = np.fromstring(self.tnx[0].get(data_key.encode()), dtype=np.float64).reshape(data_shape)
+                data[idx] = np.fromstring(self.tnx[0].get(data_key.encode()), dtype=np.uint8).reshape(data_shape)
                 label[idx] = np.fromstring(self.tnx[0].get(label_key.encode()), dtype=np.int32)
                 #print(label[idx])
                 bbox_target[idx] = np.fromstring(self.tnx[0].get(bbox_key.encode()), dtype=np.float32).reshape(bbox_shape)
@@ -189,7 +189,8 @@ class MiniBatcher(multiprocessing.Process):
                 bbox_key = '%08d_bbox'%i
                 landmark_key = '%08d_landmark'%i
 
-                data[idx] = np.fromstring(self.tnx[1].get(data_key.encode()), dtype=np.float64).reshape(data_shape)
+                data[idx] = np.fromstring(self.tnx[1].get(data_key.encode()), dtype=np.uint8).reshape(data_shape)
+                
                 label[idx] = np.fromstring(self.tnx[1].get(label_key.encode()), dtype=np.int32)
                 #print(label[idx])
                 bbox_target[idx] = np.fromstring(self.tnx[1].get(bbox_key.encode()), dtype=np.float32).reshape(bbox_shape)
@@ -197,13 +198,14 @@ class MiniBatcher(multiprocessing.Process):
                 data[idx],bbox_target[idx],landmark_target[idx] = self.random_flip_image(data[idx],bbox_target[idx],landmark_target[idx])
                 idx += 1
             # part faces
+            #print(data[0])
             for i in range(start[2], end[2]):
                 data_key = '%08d_data'%i
                 label_key = '%08d_label'%i
                 bbox_key = '%08d_bbox'%i
                 landmark_key = '%08d_landmark'%i
 
-                data[idx] = np.fromstring(self.tnx[2].get(data_key.encode()), dtype=np.float64).reshape(data_shape)
+                data[idx] = np.fromstring(self.tnx[2].get(data_key.encode()), dtype=np.uint8).reshape(data_shape)
                 label[idx] = np.fromstring(self.tnx[2].get(label_key.encode()), dtype=np.int32)
                 #print(label[idx])
                 bbox_target[idx] = np.fromstring(self.tnx[2].get(bbox_key.encode()), dtype=np.float32).reshape(bbox_shape)
@@ -216,7 +218,7 @@ class MiniBatcher(multiprocessing.Process):
                 bbox_key = '%08d_bbox'%i
                 landmark_key = '%08d_landmark'%i
 
-                data[idx] = np.fromstring(self.tnx[3].get(data_key.encode()), dtype=np.float64).reshape(data_shape)
+                data[idx] = np.fromstring(self.tnx[3].get(data_key.encode()), dtype=np.uint8).reshape(data_shape)
                 label[idx] = np.fromstring(self.tnx[3].get(label_key.encode()), dtype=np.int32)
                 #print(label[idx])
                 bbox_target[idx] = np.fromstring(self.tnx[3].get(bbox_key.encode()), dtype=np.float32).reshape(bbox_shape)

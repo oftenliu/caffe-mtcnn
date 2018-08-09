@@ -1,11 +1,12 @@
-name: "pnet"
+
+name: "mtcnn_pnet"
 layer {
   name: "PyData"
   type: "Python"
   top: "data"
-  top: "label_target"
-  top: "bbox_target"
-  top: "landmark_target"
+  top: "label"
+  top: "bbox"
+  top: "landmark"
   python_param {
     module: "pydata_layer"
     layer:  "MtcnnDataLayer"
@@ -113,12 +114,11 @@ layer {
   bottom: "conv3"
   top: "conv3"
 }
-
 layer {
-  name: "class_prob"
+  name: "conv4-1"
   type: "Convolution"
   bottom: "conv3"
-  top: "class_prob"
+  top: "conv4-1"
   param {
     lr_mult: 1
     decay_mult: 1
@@ -140,17 +140,44 @@ layer {
     }
   }
 }
-
-
+layer {
+  name: "cls_bridge"
+  type: "OftenMtcnnClassBridge"
+  bottom: "conv4-1"
+  bottom: "label"
+  top: "conv4-1-valid"
+  top: "label-valid"
+  propagate_down: 1
+  propagate_down: 0
+}
+layer {
+  name: "cls_loss"
+  type: "OftenMtcnnSoftmaxLoss"
+  bottom: "conv4-1-valid"
+  bottom: "label-valid"
+  top: "cls_loss"
+  propagate_down: 1
+  propagate_down: 0
+}
+layer {
+  name: "cls_Acc"
+  type: "OftenMtcnnAccuracy"
+  bottom: "conv4-1-valid"
+  bottom: "label-valid"
+  top: "cls_Acc"
+  include {
+    phase: TRAIN
+  }
+}
 
 layer {
-  name: "bbox_pred"
+  name: "conv4-2"
   type: "Convolution"
   bottom: "conv3"
-  top: "bbox_pred"
+  top: "conv4-2"
   param {
-    lr_mult: 1
-    decay_mult: 1
+    lr_mult: 1 #权重的学习率 该层lr=lr_mult*base_lr
+    decay_mult: 1 #权重的衰减值
   }
   param {
     lr_mult: 2
@@ -169,12 +196,24 @@ layer {
     }
   }
 }
+layer {
+  name: "roi_loss"
+  type: "OftenMtcnnEuclideanLoss"
+  bottom: "conv4-2"
+  bottom: "roi"
+  bottom: "label"
+  top: "roi_loss"
+  loss_weight: 0.5
+  propagate_down: 1
+  propagate_down: 0
+  propagate_down: 0 
+}
 
 layer {
-  name: "landmark_pred"
+  name: "conv4-3"
   type: "Convolution"
   bottom: "conv3"
-  top: "landmark_pred"
+  top: "conv4-3"
   param {
     lr_mult: 1
     decay_mult: 1
@@ -197,27 +236,15 @@ layer {
   }
 }
 
-
 layer {
-  name: "loss"
-  type: "OftenMtcnnLoss"
-  bottom: "class_prob"
-  bottom: "bbox_pred"
-  bottom: "landmark_pred"
-  bottom: "bbox_target"
-  bottom: "landmark_target"
-  bottom: "label_target"
-  top: "cls_loss"
-  top: "bbox_loss"
+  name: "landmark_loss"
+  type: "OftenMtcnnLandMarkLoss"
+  bottom: "conv4-3"
+  bottom: "landmark"
+  bottom: "label"
   top: "landmark_loss"
-  top: "cls_neg_acc"
-  top: "cls_pos_acc"
-  loss_weight: 1.0
   loss_weight: 0.5
-  loss_weight: 0.5
-  loss_weight: 0
-  loss_weight: 0
-  mtcnn_loss_param {
-    drop_loss_rate: 0.3
-  }
+  propagate_down: 1
+  propagate_down: 0
+  propagate_down: 0 
 }

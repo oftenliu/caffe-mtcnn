@@ -3,7 +3,8 @@ import time
 import numpy as np
 import sys
 import os
-
+sys.path.append('/home/ulsee/often/caffe/python')
+import caffe
 rootPath = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../"))
 sys.path.insert(0, rootPath)
 from util.common import py_nms
@@ -12,18 +13,28 @@ from mtcnn_config import config
 
 class MtcnnDetector(object):
     def __init__(self,
-                 detectors,
+                 nets,
                  min_face_size=24,
                  stride=2,
                  threshold=[0.6, 0.7, 0.7],
                  scale_factor=0.79):
-        self.pnet_detector = detectors[0]
-        self.rnet_detector = detectors[1]
-        self.onet_detector = detectors[2]
         self.min_face_size = min_face_size
         self.stride = stride
         self.thresh = threshold
         self.scale_factor = scale_factor
+
+        assert len(nets) in [2, 4, 6, 8], 'wrong number of nets'
+        self.pnet, self.rnet, self.onet, self.lnet = None, None, None, None
+        if len(nets) >= 2:
+            self.pnet = caffe.Net(nets[0], caffe.TEST, weights=nets[1])
+        if len(nets) >= 4:
+            self.rnet = caffe.Net(nets[2], caffe.TEST, weights=nets[3])
+        if len(nets) >= 6:
+            self.onet = caffe.Net(nets[4], caffe.TEST, weights=nets[5])
+
+        self.pnet_single_forward = False
+
+
 
     def convert_to_square(self, bbox):
         """
@@ -111,6 +122,7 @@ class MtcnnDetector(object):
         new_width = int(width * scale)  # resized new width
         new_dim = (new_width, new_height)
         img_resized = cv2.resize(img, new_dim, interpolation=cv2.INTER_LINEAR)  # resized image
+        img_resized = img_resized.transpose((2, 0, 1)).astype(np.float32)
         img_resized = (img_resized - 127.5) / 128
         return img_resized
 
@@ -186,9 +198,9 @@ class MtcnnDetector(object):
             # return the result predicted by pnet
             # cls_cls_map : H*w*2
             # reg: H*w*4
-            cls_cls_map, reg = self.pnet_detector.predict(im_resized)
+            cls_map, bbox_pred, landmark_pred = self._forward(self.pnet, im_resized, ['prob', 'bbox_pred', 'landmark_pred'])
             # boxes: num*9(x1,y1,x2,y2,score,x1_offset,y1_offset,x2_offset,y2_offset)
-            boxes = self.generate_bbox(cls_cls_map[:, :, 1], reg, current_scale, self.thresh[0])
+            boxes = self.generate_bbox(cls_map[:, :, 1], bbox_pred, current_scale, self.thresh[0])
 
             current_scale *= self.scale_factor
             im_resized = self.processed_image(im, current_scale)
@@ -244,11 +256,9 @@ class MtcnnDetector(object):
         for i in range(num_boxes):
             tmp = np.zeros((tmph[i], tmpw[i], 3), dtype=np.uint8)
             tmp[dy[i]:edy[i] + 1, dx[i]:edx[i] + 1, :] = im[y[i]:ey[i] + 1, x[i]:ex[i] + 1, :]
-            cropped_ims[i, :, :, :] = (cv2.resize(tmp, (24, 24)) - 127.5) / 128
-        # cls_scores : num_data*2
-        # reg: num_data*4
-        # landmark: num_data*10
-        cls_scores, reg, _ = self.rnet_detector.predict(cropped_ims)
+            cropped_ims[i, :, :, :] = (cv2.resize(tmp, (24, 24)).transpose((2, 0, 1)) -  127.5) / 128
+            
+        cls_scores, reg, landmark_pred = self._forward(self.rnet, cropped_ims, ['prob', 'bbox_pred', 'landmark_pred'])
         cls_scores = cls_scores[:, 1]
         keep_inds = np.where(cls_scores > self.thresh[1])[0]
         if len(keep_inds) > 0:
@@ -288,8 +298,10 @@ class MtcnnDetector(object):
         for i in range(num_boxes):
             tmp = np.zeros((tmph[i], tmpw[i], 3), dtype=np.uint8)
             tmp[dy[i]:edy[i] + 1, dx[i]:edx[i] + 1, :] = im[y[i]:ey[i] + 1, x[i]:ex[i] + 1, :]
-            cropped_ims[i, :, :, :] = (cv2.resize(tmp, (48, 48)) - 127.5) / 128
-        cls_scores, reg, landmark = self.onet_detector.predict(cropped_ims)
+            cropped_ims[i, :, :, :] = (cv2.resize(tmp, (48, 48)).transpose((2, 0, 1)) - 127.5) / 128
+
+        cls_scores, reg, landmark = self._forward(self.onet, cropped_ims, ['prob', 'bbox_pred', 'landmark_pred'])
+
         # prob belongs to face
         cls_scores = cls_scores[:, 1]
         keep_inds = np.where(cls_scores > self.thresh[2])[0]
@@ -314,6 +326,14 @@ class MtcnnDetector(object):
         landmark = landmark[keep]
         return boxes, boxes_c, landmark
 
+    def _forward(self, net, data, outs):
+        '''forward a net with given data, return blobs[out]
+        '''
+        net.blobs['data'].reshape(*data.shape)
+        net.blobs['data'].data[...] = data
+        net.forward()
+        return [net.blobs[out].data for out in outs]
+
     def detect_face(self, test_data):
         all_boxes = []  # save each image's bboxes
         landmarks = []
@@ -326,7 +346,7 @@ class MtcnnDetector(object):
             batch_idx += 1
             im = databatch
             # pnet
-            if self.pnet_detector:
+            if self.pnet:
                 # ignore landmark
                 boxes, boxes_c, landmark = self.detect_pnet(im)
                 if boxes_c is None:
@@ -334,7 +354,7 @@ class MtcnnDetector(object):
                     landmarks.append(np.array([]))
                     continue
             # rnet
-            if self.rnet_detector:
+            if self.rnet:
                 # ignore landmark
                 boxes, boxes_c, landmark = self.detect_rnet(im, boxes_c)
                 if boxes_c is None:
@@ -342,7 +362,7 @@ class MtcnnDetector(object):
                     landmarks.append(np.array([]))
                     continue
             # onet
-            if self.onet_detector:
+            if self.onet:
                 boxes, boxes_c, landmark = self.detect_onet(im, boxes_c)
                 if boxes_c is None:
                     all_boxes.append(np.array([]))
