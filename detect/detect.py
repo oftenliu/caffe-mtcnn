@@ -84,7 +84,7 @@ class MtcnnDetector(object):
 
     def generate_bbox(self, cls_map, reg, scale, threshold):
         """
-            generate bbox from feature cls_map
+        generate bbox from feature cls_map
         Parameters:
         ----------
             cls_map: numpy array , n x m
@@ -99,6 +99,7 @@ class MtcnnDetector(object):
         -------
             bbox array
         """
+
         cellsize = 12
         t_index = np.where(cls_map > threshold)
         # find nothing
@@ -123,14 +124,13 @@ class MtcnnDetector(object):
         new_dim = (new_width, new_height)
         img_resized = cv2.resize(img, new_dim, interpolation=cv2.INTER_LINEAR)  # resized image
         img_resized = img_resized.transpose((2, 0, 1)).astype(np.float32)
-        img_resized = (img_resized - 127.5) / 128
+        #img_resized = (img_resized - 127.5) / 128
         return img_resized
 
     def pad(self, bboxes, w, h):
         """
-            pad the the bboxes, alse restrict the size of it
+        pad the the bboxes, alse restrict the size of it
         Parameters:
-        ----------
             bboxes: numpy array, n x 5
                 input bboxes
             w: float number
@@ -138,7 +138,6 @@ class MtcnnDetector(object):
             h: float number
                 height of the input image
         Returns :
-        ------
             dy, dx : numpy array, n x 1
                 start point of the bbox in target image
             edy, edx : numpy array, n x 1
@@ -172,7 +171,8 @@ class MtcnnDetector(object):
         return return_list
 
     def detect_pnet(self, im):
-        """Get face candidates through pnet
+        """
+        Get face candidates through pnet
 
         Parameters:
         ----------
@@ -191,26 +191,31 @@ class MtcnnDetector(object):
 
         current_scale = float(net_size) / self.min_face_size  # find initial scale
         im_resized = self.processed_image(im, current_scale)
-        current_height, current_width, _ = im_resized.shape
+        _,current_height, current_width = im_resized.shape
         # for fcn
+        print("current size = [%d]"%current_height)
         all_boxes = list()
         while min(current_height, current_width) > net_size:
             # return the result predicted by pnet
-            # cls_cls_map : H*w*2
-            # reg: H*w*4
-            cls_map, bbox_pred, landmark_pred = self._forward(self.pnet, im_resized, ['prob', 'bbox_pred', 'landmark_pred'])
+            # cls_cls_map : 2*H*w
+            # reg: 4*H*w
+            im_resized = im_resized.reshape((1, 3, current_height, current_width))
+            #cls_map, bbox_pred, landmark_pred = self._forward(self.pnet, im_resized, ['prob','conv4-2','conv4-3']) #['prob', 'bbox_pred', 'landmark_pred']
+            cls_map, bbox_pred = self._forward(self.pnet, im_resized, ['prob1','conv4-2']) #['prob', 'bbox_pred', 'landmark_pred']
             # boxes: num*9(x1,y1,x2,y2,score,x1_offset,y1_offset,x2_offset,y2_offset)
-            boxes = self.generate_bbox(cls_map[:, :, 1], bbox_pred, current_scale, self.thresh[0])
+            print("1111111111111111111111111111")
+            print(cls_map)
+            #boxes = self.generate_bbox(cls_map[:,0,:, :], bbox_pred, current_scale, self.thresh[0])
 
             current_scale *= self.scale_factor
             im_resized = self.processed_image(im, current_scale)
-            current_height, current_width, _ = im_resized.shape
+            _,current_height, current_width = im_resized.shape
 
-            if boxes.size == 0:
-                continue
-            keep = py_nms(boxes[:, :5], 0.5, 'Union')
-            boxes = boxes[keep]
-            all_boxes.append(boxes)
+            #if boxes.size == 0:
+            #    continue
+            #keep = py_nms(boxes[:, :5], 0.5, 'Union')
+            #boxes = boxes[keep]
+            #all_boxes.append(boxes)
         if len(all_boxes) == 0:
             return None, None, None
         all_boxes = np.vstack(all_boxes)
@@ -346,8 +351,10 @@ class MtcnnDetector(object):
             batch_idx += 1
             im = databatch
             # pnet
+            print("herherherhehrer")
             if self.pnet:
                 # ignore landmark
+                print("pnet pnet pnet pnet")
                 boxes, boxes_c, landmark = self.detect_pnet(im)
                 if boxes_c is None:
                     all_boxes.append(np.array([]))
@@ -370,5 +377,40 @@ class MtcnnDetector(object):
                     continue
             all_boxes.append(boxes_c)
             landmarks.append(landmark)
+        return all_boxes, landmarks
+
+    def detect_single_face(self, im):
+        all_boxes = []  # save each image's bboxes
+        landmarks = []
+        batch_idx = 0
+
+        # print info
+        printStr = "\rdetect_single_face Done images: {}".format(batch_idx)
+        sys.stdout.write(printStr)
+        sys.stdout.flush()
+        batch_idx += 1
+        # pnet
+        if self.pnet:
+            # ignore landmark
+            print("\npnet detect")
+            boxes, boxes_c, landmark = self.detect_pnet(im)
+            if boxes_c is None:
+                all_boxes.append(np.array([]))
+                landmarks.append(np.array([]))
+        # rnet
+        if self.rnet:
+            # ignore landmark
+            boxes, boxes_c, landmark = self.detect_rnet(im, boxes_c)
+            if boxes_c is None:
+                all_boxes.append(np.array([]))
+                landmarks.append(np.array([]))
+        # onet
+        if self.onet:
+            boxes, boxes_c, landmark = self.detect_onet(im, boxes_c)
+            if boxes_c is None:
+                all_boxes.append(np.array([]))
+                landmarks.append(np.array([]))
+        all_boxes.append(boxes_c)
+        landmarks.append(landmark)
         return all_boxes, landmarks
 

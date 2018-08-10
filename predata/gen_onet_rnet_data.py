@@ -128,12 +128,16 @@ def __save_data(stage, data, save_path):
 
 def test_net(batch_size, stage, thresh, min_face_size, stride):
     if stage in ["rnet", "onet"]:
-        net = ['caffe-pnet/pnet.prototxt', 'caffe-pnet/pnet.caffemodel']
+        #net = ['caffe-pnet/pnet.prototxt', 'tmp/model/pnet/solver_iter_200000.caffemodel']
+        #net = ['caffe-pnet/pnet.prototxt', 'caffe-pnet/pnet.caffemodel']
+        net = ['testmodel/12net.prototxt', 'testmodel/12net.caffemodel']
+
     if stage in ["onet"]:
-        net = ['proto/p.prototxt', 'model/p.caffemodel', 'proto/r.prototxt', 'model/r.caffemodel']
+        net = ['caffe-pnet/pnet.prototxt', 'caffe-pnet/pnet.caffemodel', 'proto/r.prototxt', 'model/r.caffemodel']
     # read annatation(type:dict)
     widerImagesPath = os.path.join(rootPath, "dataset", "WIDER_train", "images")
-    annoTxtPath = os.path.join(rootPath, "dataset", "wider_face_train_bbx_gt.txt")
+    #annoTxtPath = os.path.join(rootPath, "dataset", "wider_face_train_bbx_gt.txt") #test.txt
+    annoTxtPath = os.path.join(rootPath, "dataset", "test.txt")
     data = read_wider_annotation(widerImagesPath, annoTxtPath)
 
     mtcnn_detector = MtcnnDetector(net,min_face_size=min_face_size,stride=stride, threshold=thresh)
@@ -151,6 +155,27 @@ def test_net(batch_size, stage, thresh, min_face_size, stride):
     print("\nDone! Start to do OHEM...")
 
     __save_data(stage, data, save_path)
+
+
+def test_net1(batch_size, stage, thresh, min_face_size, stride):
+    if stage in ["rnet", "onet"]:
+        #net = ['caffe-pnet/pnet.prototxt', 'tmp/model/pnet/solver_iter_200000.caffemodel']
+        net = ['caffe-pnet/pnet.prototxt', 'caffe-pnet/pnet.caffemodel']
+    if stage in ["onet"]:
+        net = ['caffe-pnet/pnet.prototxt', 'caffe-pnet/pnet.caffemodel', 'proto/r.prototxt', 'model/r.caffemodel']
+    # read annatation(type:dict)
+    widerImagesPath = os.path.join(rootPath, "dataset", "WIDER_train", "images")
+    #annoTxtPath = os.path.join(rootPath, "dataset", "wider_face_train_bbx_gt.txt") #test.txt
+    annoTxtPath = os.path.join(rootPath, "dataset", "test.txt")
+    data = read_wider_annotation(widerImagesPath, annoTxtPath)
+
+    mtcnn_detector = MtcnnDetector(net,min_face_size=min_face_size,stride=stride, threshold=thresh)
+
+    im = cv2.imread("tmp/data/pnet/pos/1.jpg")
+    # do detect
+    detections, _ = mtcnn_detector.detect_single_face(im)
+
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Create hard bbox sample...',
