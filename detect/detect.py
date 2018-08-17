@@ -102,11 +102,12 @@ class MtcnnDetector(object):
 
         cellsize = 12
         t_index = np.where(cls_map > threshold)
-        # find nothing
+
         if t_index[0].size == 0:
             return np.array([])
         # offset
-        dx1, dy1, dx2, dy2 = [reg[t_index[0], t_index[1], i] for i in range(4)]
+
+        dx1, dy1, dx2, dy2 = [reg[0,i, t_index[0], t_index[1]] for i in range(4)]
         reg = np.array([dx1, dy1, dx2, dy2])
         score = cls_map[t_index[0], t_index[1]]
         boundingbox = np.vstack([np.round((self.stride * t_index[1]) / scale),
@@ -122,9 +123,9 @@ class MtcnnDetector(object):
         new_height = int(height * scale)  # resized new height
         new_width = int(width * scale)  # resized new width
         new_dim = (new_width, new_height)
-        img_resized = cv2.resize(img, new_dim, interpolation=cv2.INTER_LINEAR)  # resized image
+        img_resized = cv2.resize(img, new_dim)  # resized image
         img_resized = img_resized.transpose((2, 0, 1)).astype(np.float32)
-        #img_resized = (img_resized - 127.5) / 128
+        img_resized = (img_resized - 127.5)/127.5
         return img_resized
 
     def pad(self, bboxes, w, h):
@@ -193,34 +194,35 @@ class MtcnnDetector(object):
         im_resized = self.processed_image(im, current_scale)
         _,current_height, current_width = im_resized.shape
         # for fcn
-        print("current size = [%d]"%current_height)
+        #print("current size = [%d]"%current_height)
         all_boxes = list()
         while min(current_height, current_width) > net_size:
             # return the result predicted by pnet
             # cls_cls_map : 2*H*w
             # reg: 4*H*w
             im_resized = im_resized.reshape((1, 3, current_height, current_width))
-            #cls_map, bbox_pred, landmark_pred = self._forward(self.pnet, im_resized, ['prob','conv4-2','conv4-3']) #['prob', 'bbox_pred', 'landmark_pred']
-            cls_map, bbox_pred = self._forward(self.pnet, im_resized, ['prob1','conv4-2']) #['prob', 'bbox_pred', 'landmark_pred']
+            cls_map, bbox_pred, landmark_pred = self._forward(self.pnet, im_resized, ['prob','conv4-2','conv4-3']) #['prob', 'bbox_pred', 'landmark_pred']
+            #cls_map, bbox_pred = self._forward(self.pnet, im_resized, ['prob1','conv4-2']) #['prob', 'bbox_pred', 'landmark_pred']
             # boxes: num*9(x1,y1,x2,y2,score,x1_offset,y1_offset,x2_offset,y2_offset)
-            print("1111111111111111111111111111")
-            print(cls_map)
-            #boxes = self.generate_bbox(cls_map[:,0,:, :], bbox_pred, current_scale, self.thresh[0])
+            
+            #print(cls_map[0][1])
+            boxes = self.generate_bbox(cls_map[0][1], bbox_pred, current_scale, self.thresh[0])
 
             current_scale *= self.scale_factor
             im_resized = self.processed_image(im, current_scale)
             _,current_height, current_width = im_resized.shape
 
-            #if boxes.size == 0:
-            #    continue
-            #keep = py_nms(boxes[:, :5], 0.5, 'Union')
-            #boxes = boxes[keep]
-            #all_boxes.append(boxes)
+            if boxes.size == 0:
+                continue
+            keep = py_nms(boxes[:, :5], 0.5, 'Union')
+            boxes = boxes[keep]
+            all_boxes.append(boxes)
         if len(all_boxes) == 0:
             return None, None, None
         all_boxes = np.vstack(all_boxes)
         # merge the detection from first stage
         keep = py_nms(all_boxes[:, 0:5], 0.7, 'Union')
+        #print("run the nms,thresold = 0.7")
         all_boxes = all_boxes[keep]
         boxes = all_boxes[:, :5]
         bbw = all_boxes[:, 2] - all_boxes[:, 0] + 1
@@ -272,7 +274,7 @@ class MtcnnDetector(object):
             reg = reg[keep_inds]
         else:
             return None, None, None
-        keep = py_nms(boxes, 0.6)
+        keep = py_nms(boxes, 0.7)
         boxes = boxes[keep]
         boxes_c = self.calibrate_box(boxes, reg[keep])
         return boxes, boxes_c, None
@@ -351,10 +353,10 @@ class MtcnnDetector(object):
             batch_idx += 1
             im = databatch
             # pnet
-            print("herherherhehrer")
+            
             if self.pnet:
                 # ignore landmark
-                print("pnet pnet pnet pnet")
+                
                 boxes, boxes_c, landmark = self.detect_pnet(im)
                 if boxes_c is None:
                     all_boxes.append(np.array([]))

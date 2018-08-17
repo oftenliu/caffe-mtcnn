@@ -147,10 +147,22 @@ def put_db(txn, dataset):
 def write_db(dbname,net, iterType,shuffling):
     dataset = []
     i = 0
-    db = lmdb.open(dbname, map_size=G16)
-    txn = db.begin(write=True)
     for line in iter_all_data(net, iterType):
         data_example = parse_data(line)
+        dataset.append(data_example)
+        if i % 10000 == 0:
+            logger.info('read [%d]image files.'%i) 
+        i+=1
+    logger.info('read image files finish')    
+
+    if shuffling:
+        np.random.shuffle(dataset)
+
+    i = 0
+    db = lmdb.open(dbname, map_size=G16)
+    txn = db.begin(write=True)   
+    databuf = [] 
+    for data_example in dataset:  
         image_data, height, width = process_image_withoutcoder(data_example['filename'])
         class_label = data_example['label']
         bbox = data_example['bbox']
@@ -165,33 +177,31 @@ def write_db(dbname,net, iterType,shuffling):
         #print(class_label)
         roi = np.asarray(roi, dtype=np.float32)
         roi = roi.tostring()  # float32
-        landmark = np.asarray(landmark, dtype=float)
+        landmark = np.asarray(landmark, dtype=np.float32)
         landmark = landmark.astype(np.float32).tostring()  # float32
 
-        dataset.append([i,image_data,class_label,roi,landmark])
-    
-        
+        databuf.append([i,image_data,class_label,roi,landmark])
+            
         i = i + 1
         if i % 1000 == 0:
-            if shuffling:
-                np.random.shuffle(dataset)
-            put_db(txn,dataset)
+            put_db(txn,databuf)
             txn.commit()
             txn = db.begin(write = True)
-            dataset = []
+            databuf = []
         if i % 10000 == 0:
             logger.info('Processed [%d] files.'%i)
+            print('Processed [%d] files.'%i)
     if i % 1000 != 0:
-        if shuffling:
-            np.random.shuffle(dataset)
-        put_db(txn,dataset)
+        put_db(txn,databuf)
+        databuf = []
         logger.info('Processed [%d] files.'%i)
-        print('Processed [%d] files.'%i)
     txn.put(('size').encode(), str(i).encode())
     txn.commit()
     db.close()
     logger.info('Create [ %s ] [ num %d] Finish'%(dbname,i))
-    print('Create [ %s ] Finish'%dbname)
+
+
+
 
 def gen_lmdb(filename, net, type,shuffling = True):
     remove_if_exists(filename)
@@ -205,10 +215,14 @@ def gen_lmdb(filename, net, type,shuffling = True):
 
 def start(net):
     saveFolder = os.path.join(rootPath, "tmp/data/%s/"%(net))
-
-    for n in ['pos', 'neg', 'part', 'landmark']:
+    if net == 'pnet':
+        n = 'all'
         filename = os.path.join(saveFolder, "%sdb"%(n))
-        gen_lmdb(filename, net, n)
+        gen_lmdb(filename, net, n)       
+    else:
+        for n in ['pos', 'neg', 'part', 'landmark']:
+            filename = os.path.join(saveFolder, "%sdb"%(n))
+            gen_lmdb(filename, net, n)
     # Finally, write the labels file:
     logger.info('\nFinished converting the MTCNN dataset!')
 
@@ -225,7 +239,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    stage = args.stage
+    stage = 'pnet'
     if stage not in ['pnet', 'rnet', 'onet']:
         raise Exception("Please specify stage by --stage=pnet or rnet or onet")
 

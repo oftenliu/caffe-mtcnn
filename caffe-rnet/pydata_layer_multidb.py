@@ -43,10 +43,11 @@ class MtcnnDataLayer(caffe.Layer):
         self.net_type = layer_params.get('net_type', 'pnet')
         self.net_size = cfg.NET_INPUT_SIZE[self.net_type]
 
-        print("\n\n\n==============================\n\n\n============================\n\n\n\n")
-        print("here start[0] = , end[0] = ")
-        print("\n\n\n==============================\n\n\n============================\n\n\n\n")    
-        db_names_train = '../tmp/data/%s/alldb'%self.net_type
+    
+        db_names_train = ['../tmp/data/%s/negdb'%self.net_type,
+                          '../tmp/data/%s/posdb'%self.net_type,
+                          '../tmp/data/%s/partdb'%self.net_type,
+                          '../tmp/data/%s/landmarkdb'%self.net_type]
 
         self.queue_train = multiprocessing.Queue(32)
         batcher_train = MiniBatcher(db_names_train, self.batch_size, self.net_type)
@@ -95,18 +96,25 @@ class MiniBatcher(multiprocessing.Process):
         '''
         super(MiniBatcher, self).__init__()
         self.batch_size = batch_size
-        self.start_pos = 0
+        self.start_pos = [0 for _ in range(4)]
         self.net_type = net_type
         self.db_names = db_names
-        self.db = lmdb.open(db_names)
-        self.tnx = self.db.begin()
-        self.db_size = int(self.tnx.get('size'.encode()))
+        self.db = [lmdb.open(db_name) for db_name in db_names]
+        self.tnx = [db.begin() for db in self.db]
+        self.db_size = [int(tnx.get('size'.encode())) for tnx in self.tnx]
+        print("db_size[0]=%d db_size[1]=%d db_size[2]=%d db_size[3]=%d"%(self.db_size[0],self.db_size[1],self.db_size[2],self.db_size[3]))
+        data_ratio = reduce(lambda x,y:x+y,cfg.DATA_RATIO[self.net_type])
+        self.data_size = [int(np.ceil(batch_size*ratio/data_ratio)) for ratio in cfg.DATA_RATIO[self.net_type]]  #向上取整
+        self.data_size[0] = self.batch_size - self.data_size[1] - self.data_size[2] - self.data_size[3]
+        print("neg=%d pos=%d part=%d landmark=%d"%(self.db_size[0],self.db_size[1],self.db_size[2],self.db_size[3]))
+        print("neg_data_size[0]=%d pos_data_size[1]=%d part_data_size[2]=%d landmark_data_size[3]=%d"%(self.data_size[0],self.data_size[1],self.data_size[2],self.data_size[3]))
         self.net_size = cfg.NET_INPUT_SIZE[self.net_type]
 
     def __del__(self):
-        self.tnx.abort()
-
-        self.db.close()
+        for tnx in self.tnx:
+            tnx.abort()
+        for db in self.db:
+            db.close()
 
     def set_queue(self, queue):
         self.queue = queue
@@ -147,32 +155,77 @@ class MiniBatcher(multiprocessing.Process):
             label = np.zeros(batch_size, dtype=np.int32)
 
             start = self.start_pos
-            end = start + self.batch_size
+            end = [start[i] + self.data_size[i] for i in range(4)]
+            for i in range(4):
+                if end[i] > self.db_size[i]:
+                  end[i] -= self.db_size[i]
+                  start[i] = end[i]
+                  end[i] = start[i] + self.data_size[i]
 
-            if end > self.db_size:
-                end -= self.db_size
-                start = end
-                end = start + self.batch_size
-
+            
             idx = 0
             #print("\n\n\n==============================\n\n\n============================\n\n\n\n")
             #print("here start[0] = [%d], end[0] = [%d]"%(start[0],end[0]))
             #print("\n\n\n==============================\n\n\n============================\n\n\n\n")
             # negatives
 
-            for i in range(start, end):
+            for i in range(start[0], end[0]):
                 data_key = '%08d_data'%i
                 label_key = '%08d_label'%i
                 bbox_key = '%08d_bbox'%i
                 landmark_key = '%08d_landmark'%i
 
-                data[idx] = np.fromstring(self.tnx.get(data_key.encode()), dtype=np.float32).reshape(data_shape)
-                label[idx] = np.fromstring(self.tnx.get(label_key.encode()), dtype=np.int32)
+                data[idx] = np.fromstring(self.tnx[0].get(data_key.encode()), dtype=np.float32).reshape(data_shape)
+                label[idx] = np.fromstring(self.tnx[0].get(label_key.encode()), dtype=np.int32)
                 #print(label[idx])
-                bbox_target[idx] = np.fromstring(self.tnx.get(bbox_key.encode()), dtype=np.float32).reshape(bbox_shape)
-                landmark_target[idx] = np.fromstring(self.tnx.get(landmark_key.encode()), dtype=np.float32).reshape(landmark_shape)
+                bbox_target[idx] = np.fromstring(self.tnx[0].get(bbox_key.encode()), dtype=np.float32).reshape(bbox_shape)
+                landmark_target[idx] = np.fromstring(self.tnx[0].get(landmark_key.encode()), dtype=np.float32).reshape(landmark_shape)
                 
                 idx += 1
+            # positives
+            for i in range(start[1], end[1]):
+                data_key = '%08d_data'%i
+                label_key = '%08d_label'%i
+                bbox_key = '%08d_bbox'%i
+                landmark_key = '%08d_landmark'%i
+
+                data[idx] = np.fromstring(self.tnx[1].get(data_key.encode()), dtype=np.float32).reshape(data_shape)
+                
+                label[idx] = np.fromstring(self.tnx[1].get(label_key.encode()), dtype=np.int32)
+                #print(label[idx])
+                bbox_target[idx] = np.fromstring(self.tnx[1].get(bbox_key.encode()), dtype=np.float32).reshape(bbox_shape)
+                landmark_target[idx] = np.fromstring(self.tnx[1].get(landmark_key.encode()), dtype=np.float32).reshape(landmark_shape)
+                data[idx],bbox_target[idx],landmark_target[idx] = self.random_flip_image(data[idx],bbox_target[idx],landmark_target[idx])
+                idx += 1
+            # part faces
+            #print(data[0])
+            for i in range(start[2], end[2]):
+                data_key = '%08d_data'%i
+                label_key = '%08d_label'%i
+                bbox_key = '%08d_bbox'%i
+                landmark_key = '%08d_landmark'%i
+
+                data[idx] = np.fromstring(self.tnx[2].get(data_key.encode()), dtype=np.float32).reshape(data_shape)
+                label[idx] = np.fromstring(self.tnx[2].get(label_key.encode()), dtype=np.int32)
+                #print(label[idx])
+                bbox_target[idx] = np.fromstring(self.tnx[2].get(bbox_key.encode()), dtype=np.float32).reshape(bbox_shape)
+                landmark_target[idx] = np.fromstring(self.tnx[2].get(landmark_key.encode()), dtype=np.float32).reshape(landmark_shape)
+                idx += 1
+            # landmark faces
+            for i in range(start[3], end[3]):
+                data_key = '%08d_data'%i
+                label_key = '%08d_label'%i
+                bbox_key = '%08d_bbox'%i
+                landmark_key = '%08d_landmark'%i
+
+                data[idx] = np.fromstring(self.tnx[3].get(data_key.encode()), dtype=np.float32).reshape(data_shape)
+                label[idx] = np.fromstring(self.tnx[3].get(label_key.encode()), dtype=np.int32)
+                #print(label[idx])
+                bbox_target[idx] = np.fromstring(self.tnx[3].get(bbox_key.encode()), dtype=np.float32).reshape(bbox_shape)
+                landmark_target[idx] = np.fromstring(self.tnx[3].get(landmark_key.encode()), dtype=np.float32).reshape(landmark_shape)
+                data[idx],bbox_target[idx],landmark_target[idx] = self.random_flip_image(data[idx],bbox_target[idx],landmark_target[idx])
+                idx += 1
+
             self.start_pos = end
 
             minibatch = {'data': data,
