@@ -20,27 +20,23 @@ def read_wider_annotation(widerImagesPath, annoTxtPath):
     data = dict()
     images = []
     bboxes = []
-    labelfile = open(annoTxtPath, 'r')
-    while True:
+    annotationsFile = open(annoTxtPath, "r")
+    for annotation in annotationsFile:
+        annotation = annotation.strip().split(' ')
         # image path
-        imagepath = labelfile.readline().strip('\n')
-        if not imagepath:
-            break
-        imagepath = os.path.join(widerImagesPath, imagepath)
-        images.append(imagepath)
-        # face numbers
-        nums = labelfile.readline().strip('\n')
-        one_image_bboxes = []
-        for i in range(int(nums)):
-            bb_info = labelfile.readline().strip('\n').split(' ')
-            # only need x, y, w, h
-            face_box = [float(bb_info[i]) for i in range(4)]
-            xmin = face_box[0]
-            ymin = face_box[1]
-            xmax = xmin + face_box[2]
-            ymax = ymin + face_box[3]
-            one_image_bboxes.append([xmin, ymin, xmax, ymax])
-        bboxes.append(one_image_bboxes)
+        imPath = annotation[0]
+        # boxed change to float type
+        #box坐标转换为array数组  使用np处理数据
+        bbox = list(map(float, annotation[1:]))
+        # gt. each row mean bounding box
+        boxes = np.array(bbox, dtype=np.float32).reshape(-1, 4)
+        #load image
+        file_abspath = os.path.join(widerImagesPath, imPath +'.jpg')
+        img = cv2.imread(file_abspath)
+
+        images.append(file_abspath)
+        bboxes.append(boxes)
+
     data['images'] = images#all image pathes
     data['bboxes'] = bboxes#all image bboxes
     return data
@@ -128,15 +124,15 @@ def __save_data(stage, data, save_path):
 
 def test_net(batch_size, stage, thresh, min_face_size, stride):
     if stage in ["rnet", "onet"]:
-        net = ['caffe-pnet/pnet.prototxt', 'tmp/model/pnet/train0815/solver2_iter_500000.caffemodel']
+        #net = ['caffe-pnet/pnet.prototxt', 'tmp/model/pnet/train0815/solver2_iter_500000.caffemodel']
         #net = ['caffe-pnet/pnet.prototxt', 'caffe-pnet/pnet.caffemodel']
-        #net = ['testmodel/det1.prototxt', 'testmodel/det1.caffemodel']
+        net = ['testmodel/det1.prototxt', 'testmodel/det1.caffemodel']
 
     if stage in ["onet"]:
         net = ['caffe-pnet/pnet.prototxt', 'caffe-pnet/pnet.caffemodel', 'proto/r.prototxt', 'model/r.caffemodel']
     # read annatation(type:dict)
     widerImagesPath = os.path.join(rootPath, "dataset", "WIDER_train", "images")
-    annoTxtPath = os.path.join(rootPath, "dataset", "wider_face_train_bbx_gt.txt") #test.txt
+    annoTxtPath = os.path.join(rootPath, "dataset", "wider_face_train.txt") #test.txt
     #annoTxtPath = os.path.join(rootPath, "dataset", "test.txt")
     data = read_wider_annotation(widerImagesPath, annoTxtPath)
 
@@ -197,7 +193,7 @@ if __name__ == '__main__':
         os.environ["CUDA_VISIBLE_DEVICES"] = gpus
     if stage == "rnet":
         batchSize = 1
-        threshold = [0.4, 0.5,0.6]
+        threshold = [0.5, 0.5,0.6]
         minFace = 24
         stride = 2
     elif stage == "onet":

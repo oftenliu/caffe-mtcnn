@@ -7,15 +7,10 @@ layer {
   top: "label"
   top: "bbox"
   top: "landmark"
-  transform_param {
-    mirror: false
-    mean_value: 127.5
-    scale: 0.0078125
-  }
-  data_param {
-    source: "train_lmdb12"
-    batch_size: 64
-    backend: LMDB
+  python_param {
+    module: "pydata_layer"
+    layer:  "MtcnnDataLayer"
+    param_str: "{\'batch_size\': 384, \'net_type\': \'pnet\'}"
   }
 }
 layer {

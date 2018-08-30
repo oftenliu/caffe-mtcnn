@@ -1,20 +1,21 @@
-
 name: "mtcnn_pnet"
 layer {
-  name: "PyData"
-  type: "Python"
+  name: "pnet"
+  type: "OftenMtcnnData"
   top: "data"
   top: "label"
-  top: "bbox"
-  top: "landmark"
+  top: "roi"
+  #top: "landmark"
+
   transform_param {
     mirror: false
     mean_value: 127.5
     scale: 0.0078125
   }
+
   data_param {
-    source: "train_lmdb12"
-    batch_size: 64
+    source: "examples/mtcnn/pnet_db"
+    batch_size: 320#64    #384
     backend: LMDB
   }
 }
@@ -202,12 +203,12 @@ layer {
   }
 }
 layer {
-  name: "bbox_loss"
+  name: "roi_loss"
   type: "OftenMtcnnEuclideanLoss"
   bottom: "conv4-2"
-  bottom: "bbox"
+  bottom: "roi"
   bottom: "label"
-  top: "bbox_loss"
+  top: "roi_loss"
   loss_weight: 0.5
   propagate_down: 1
   propagate_down: 0
@@ -251,5 +252,5 @@ layer {
 #  loss_weight: 0.5
 #  propagate_down: 1
 #  propagate_down: 0
-#  propagate_down: 0 
+ # propagate_down: 0 
 #}

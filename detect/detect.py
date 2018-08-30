@@ -201,13 +201,13 @@ class MtcnnDetector(object):
             # cls_cls_map : 2*H*w
             # reg: 4*H*w
             im_resized = im_resized.reshape((1, 3, current_height, current_width))
-            cls_map, bbox_pred, landmark_pred = self._forward(self.pnet, im_resized, ['prob','conv4-2','conv4-3']) #['prob', 'bbox_pred', 'landmark_pred']
-            #cls_map, bbox_pred = self._forward(self.pnet, im_resized, ['prob1','conv4-2']) #['prob', 'bbox_pred', 'landmark_pred']
+            #cls_map, bbox_pred, landmark_pred = self._forward(self.pnet, im_resized, ['prob','conv4-2','conv4-3']) #['prob', 'bbox_pred', 'landmark_pred']
+            cls_map, bbox_pred = self._forward(self.pnet, im_resized, ['prob1','conv4-2']) #['prob', 'bbox_pred', 'landmark_pred']
             # boxes: num*9(x1,y1,x2,y2,score,x1_offset,y1_offset,x2_offset,y2_offset)
             
-            #print(cls_map[0][1])
+            print(cls_map[0][1])
             boxes = self.generate_bbox(cls_map[0][1], bbox_pred, current_scale, self.thresh[0])
-
+            
             current_scale *= self.scale_factor
             im_resized = self.processed_image(im, current_scale)
             _,current_height, current_width = im_resized.shape

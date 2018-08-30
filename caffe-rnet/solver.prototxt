@@ -5,8 +5,8 @@ momentum: 0.9
 weight_decay: 0.004
 # The learning rate policy
 lr_policy: "step"
-stepsize: 10000
-gamma: 0.8
+stepsize: 20000
+gamma: 0.1
 display: 200
 max_iter: 100000
 snapshot: 10000
