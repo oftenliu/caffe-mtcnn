@@ -159,7 +159,7 @@ def write_db(dbname,net, iterType,shuffling):
         np.random.shuffle(dataset)
 
     i = 0
-    db = lmdb.open(dbname, map_size=G16)
+    db = lmdb.open(dbname, map_size=G24)
     txn = db.begin(write=True)   
     databuf = [] 
     for data_example in dataset:  
@@ -239,7 +239,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    stage = 'pnet'
+    stage = 'rnet'
     if stage not in ['pnet', 'rnet', 'onet']:
         raise Exception("Please specify stage by --stage=pnet or rnet or onet")
 

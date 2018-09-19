@@ -9,11 +9,9 @@ rootPath = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__
 sys.path.insert(0, rootPath)
 from util.common import IOU, convert_to_square
 
-from model.mtcnnmodel import mtcnn_pnet, mtcnn_rnet
+
 from mtcnn_config import config
 from util.loader import TestLoader
-from detect.ronet_detect import ROnetDetect
-from detect.pnet_detect import PnetDetect
 from detect.detect import MtcnnDetector
 
 def read_wider_face_train(widerImagesPath, annoTxtPath):
@@ -47,6 +45,7 @@ def read_wider_annotation(widerImagesPath, annoTxtPath):
     images = []
     bboxes = []
     labelfile = open(annoTxtPath, 'r')
+    sum = 0 
     while True:
         # image path
         imagepath = labelfile.readline().strip('\n')
@@ -67,6 +66,9 @@ def read_wider_annotation(widerImagesPath, annoTxtPath):
             ymax = ymin + face_box[3]
             one_image_bboxes.append([xmin, ymin, xmax, ymax])
         bboxes.append(one_image_bboxes)
+        sum += 1
+
+    print(">>>>>> The img num is  %d..."%(sum))    
     data['images'] = images#all image pathes
     data['bboxes'] = bboxes#all image bboxes
     return data
@@ -155,12 +157,12 @@ def __save_data(stage, data, save_path):
 
 def test_net(batch_size, stage, thresh, min_face_size, stride):
     if stage in ["rnet", "onet"]:
-        #net = ['caffe-pnet/pnet.prototxt', 'tmp/model/pnet/train0815/solver2_iter_500000.caffemodel']
+        net = ['caffe-pnet/pnet.prototxt', 'tmp/model/pnet/solver2_iter_200000.caffemodel']
         #net = ['caffe-pnet/pnet.prototxt', 'caffe-pnet/pnet.caffemodel']
-        net = ['testmodel/train_12.prototxt', 'testmodel/solver_iter_250000.caffemodel']
+        #net = ['testmodel/train_12.prototxt', 'testmodel/solver_iter_250000.caffemodel']
 
     if stage in ["onet"]:
-        net = ['caffe-pnet/pnet.prototxt', 'caffe-pnet/pnet.caffemodel', 'proto/r.prototxt', 'model/r.caffemodel']
+        net = ['caffe-pnet/pnet.prototxt', 'tmp/model/pnet/solver2_iter_200000.caffemodel', 'caffe-rnet/rnet.prototxt', 'tmp/model/rnet/0912/solver_iter_200000.caffemodel']
     # read annatation(type:dict)
     widerImagesPath = os.path.join(rootPath, "dataset", "WIDER_train", "images")
     annoTxtPath = os.path.join(rootPath, "dataset", "wider_face_train_bbx_gt.txt") #test.txt
@@ -225,11 +227,11 @@ if __name__ == '__main__':
     if stage == "rnet":
         batchSize = 1
         threshold = [0.4, 0.5,0.6]
-        minFace = 12
+        minFace = 24
         stride = 2
     elif stage == "onet":
         batchSize = 1
-        threshold = [0.4, 0.5,0.6]
+        threshold = [0.6, 0.6,0.7]
         minFace = 24
         stride = 2
     else:

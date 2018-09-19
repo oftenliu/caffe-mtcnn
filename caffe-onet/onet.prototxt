@@ -1,17 +1,10 @@
-
-layer {
-  name: "PyData"
-  type: "Python"
-  top: "data"
-  top: "label"
-  top: "bbox"
-  top: "landmark"
-  python_param {
-    module: "pydata_layer_multidb"
-    layer:  "MtcnnDataLayer"
-    param_str: "{\'batch_size\': 384, \'net_type\': \'rnet\'}"
-  }
-}
+name: "ONet"
+input: "data"
+input_dim: 1
+input_dim: 3
+input_dim: 48
+input_dim: 48
+##################################
 layer {
   name: "conv1"
   type: "Convolution"
@@ -26,7 +19,7 @@ layer {
     decay_mult: 1
   }
   convolution_param {
-    num_output: 28
+    num_output: 32
     kernel_size: 3
     stride: 1
      weight_filler {
@@ -55,7 +48,6 @@ layer {
     stride: 2
   }
 }
-
 layer {
   name: "conv2"
   type: "Convolution"
@@ -70,10 +62,10 @@ layer {
     decay_mult: 1
   }
   convolution_param {
-    num_output: 48
+    num_output: 64
     kernel_size: 3
     stride: 1
-    weight_filler {
+     weight_filler {
       type: "xavier"
 	}
     bias_filler {
@@ -82,6 +74,7 @@ layer {
     }
   }
 }
+
 layer {
   name: "prelu2"
   type: "PReLU"
@@ -99,9 +92,7 @@ layer {
     stride: 2
   }
 }
-####################################
 
-##################################
 layer {
   name: "conv3"
   type: "Convolution"
@@ -116,9 +107,8 @@ layer {
     decay_mult: 1
   }
   convolution_param {
-    num_output: 64
-    kernel_size: 2
-    stride: 1
+	num_output: 64
+	kernel_size: 3
     weight_filler {
       type: "xavier"
 	}
@@ -134,14 +124,21 @@ layer {
   bottom: "conv3"
   top: "conv3"
 }
-###############################
-
-###############################
-
+layer {
+  name: "pool3"
+  type: "Pooling"
+  bottom: "conv3"
+  top: "pool3"
+  pooling_param {
+    pool: MAX
+    kernel_size: 2
+    stride: 2
+  }
+}
 layer {
   name: "conv4"
-  type: "InnerProduct"
-  bottom: "conv3"
+  type: "Convolution"
+  bottom: "pool3"
   top: "conv4"
   param {
     lr_mult: 1
@@ -151,8 +148,9 @@ layer {
     lr_mult: 2
     decay_mult: 1
   }
-  inner_product_param {
-    num_output: 128
+  convolution_param {
+	num_output: 128
+	kernel_size: 2
     weight_filler {
       type: "xavier"
 	}
@@ -169,11 +167,12 @@ layer {
   top: "conv4"
 }
 
+
 layer {
-  name: "conv5-1"
+  name: "conv5"
   type: "InnerProduct"
   bottom: "conv4"
-  top: "conv5-1"
+  top: "conv5"
   param {
     lr_mult: 1
     decay_mult: 1
@@ -183,9 +182,8 @@ layer {
     decay_mult: 1
   }
   inner_product_param {
-    num_output: 2
-    #kernel_size: 1
-    #stride: 1
+	#kernel_size: 3
+	num_output: 256
     weight_filler {
       type: "xavier"
 	}
@@ -196,44 +194,28 @@ layer {
   }
 }
 
-
 layer {
-  name: "cls_bridge"
-  type: "OftenMtcnnClassBridge"
-  bottom: "conv5-1"
-  bottom: "label"
-  top: "conv5-1-valid"
-  top: "label-valid"
-  propagate_down: 1
-  propagate_down: 0
-}
-layer {
-  name: "cls_loss"
-  type: "OftenMtcnnSoftmaxLoss"
-  bottom: "conv5-1-valid"
-  bottom: "label-valid"
-  top: "cls_loss"
-  propagate_down: 1
-  propagate_down: 0
-}
-layer {
-  name: "cls_Acc"
-  type: "OftenMtcnnAccuracy"
-  bottom: "conv5-1-valid"
-  bottom: "label-valid"
-  top: "cls_Acc"
-  include {
-    phase: TRAIN
+  name: "drop5"
+  type: "Dropout"
+  bottom: "conv5"
+  top: "conv5"
+  dropout_param {
+    dropout_ratio: 0.25
   }
 }
-
+layer {
+  name: "prelu5"
+  type: "PReLU"
+  bottom: "conv5"
+  top: "conv5"
+}
 
 
 layer {
-  name: "conv5-2"
+  name: "conv6-1"
   type: "InnerProduct"
-  bottom: "conv4"
-  top: "conv5-2"
+  bottom: "conv5"
+  top: "conv6-1"
   param {
     lr_mult: 1
     decay_mult: 1
@@ -243,10 +225,9 @@ layer {
     decay_mult: 1
   }
   inner_product_param {
-    num_output: 4
     #kernel_size: 1
-    #stride: 1
-     weight_filler {
+	num_output: 2
+    weight_filler {
       type: "xavier"
 	}
     bias_filler {
@@ -255,59 +236,59 @@ layer {
     }
   }
 }
-
-
-
-
 layer {
-  name: "bbox_loss"
-  type: "OftenMtcnnEuclideanLoss"
-  bottom: "conv5-2"
-  bottom: "bbox"
-  bottom: "label"
-  top: "bbox_loss"
-  loss_weight: 0.5
-  propagate_down: 1
-  propagate_down: 0
-  propagate_down: 0 
-}
-
-
-
-layer {
-  name: "conv5-3"
+  name: "conv6-2"
   type: "InnerProduct"
-  bottom: "conv4"
-  top: "conv5-3"
+  bottom: "conv5"
+  top: "conv6-2"
   param {
     lr_mult: 1
     decay_mult: 1
   }
   param {
     lr_mult: 2
-    decay_mult: 0
+    decay_mult: 1
   }
   inner_product_param {
-    num_output: 10
+  	#kernel_size: 1
+	num_output: 4
     weight_filler {
-     type: "xavier"
-    }
+      type: "xavier"
+	}
     bias_filler {
       type: "constant"
       value: 0
     }
   }
 }
-
 layer {
-  name: "landmark_loss"
-  type: "OftenMtcnnLandMarkLoss"
-  bottom: "conv5-3"
-  bottom: "landmark"
-  bottom: "label"
-  top: "landmark_loss"
-  loss_weight: 0.5
-  propagate_down: 1
-  propagate_down: 0
-  propagate_down: 0 
+  name: "conv6-3"
+  type: "InnerProduct"
+  bottom: "conv5"
+  top: "conv6-3"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 1
+  }
+  inner_product_param {
+  	#kernel_size: 1
+	num_output: 10
+    weight_filler {
+      type: "xavier"
+	}
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "prob1"
+  type: "Softmax"
+  bottom: "conv6-1"
+  top: "prob1"
 }

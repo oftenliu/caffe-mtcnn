@@ -3,7 +3,7 @@ import time
 import numpy as np
 import sys
 import os
-sys.path.append('/home/ulsee/often/caffe/python')
+sys.path.append('/home/often/often/caffe/python')
 import caffe
 rootPath = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../"))
 sys.path.insert(0, rootPath)
@@ -201,8 +201,8 @@ class MtcnnDetector(object):
             # cls_cls_map : 2*H*w
             # reg: 4*H*w
             im_resized = im_resized.reshape((1, 3, current_height, current_width))
-            #cls_map, bbox_pred, landmark_pred = self._forward(self.pnet, im_resized, ['prob','conv4-2','conv4-3']) #['prob', 'bbox_pred', 'landmark_pred']
-            cls_map, bbox_pred = self._forward(self.pnet, im_resized, ['prob1','conv4-2']) #['prob', 'bbox_pred', 'landmark_pred']
+            cls_map, bbox_pred = self._forward(self.pnet, im_resized, ['prob','conv4-2']) #['prob', 'bbox_pred', 'landmark_pred']
+            #cls_map, bbox_pred = self._forward(self.pnet, im_resized, ['prob1','conv4-2']) #['prob', 'bbox_pred', 'landmark_pred']
             # boxes: num*9(x1,y1,x2,y2,score,x1_offset,y1_offset,x2_offset,y2_offset)
             
             #print(cls_map[0][1])
@@ -259,13 +259,13 @@ class MtcnnDetector(object):
 
         [dy, edy, dx, edx, y, ey, x, ex, tmpw, tmph] = self.pad(dets, w, h)
         num_boxes = dets.shape[0]
-        cropped_ims = np.zeros((num_boxes, 24, 24, 3), dtype=np.float32)
+        cropped_ims = np.zeros((num_boxes, 3, 24, 24), dtype=np.float32)
         for i in range(num_boxes):
             tmp = np.zeros((tmph[i], tmpw[i], 3), dtype=np.uint8)
             tmp[dy[i]:edy[i] + 1, dx[i]:edx[i] + 1, :] = im[y[i]:ey[i] + 1, x[i]:ex[i] + 1, :]
             cropped_ims[i, :, :, :] = (cv2.resize(tmp, (24, 24)).transpose((2, 0, 1)) -  127.5) / 128
             
-        cls_scores, reg, landmark_pred = self._forward(self.rnet, cropped_ims, ['prob', 'bbox_pred', 'landmark_pred'])
+        cls_scores, reg, landmark_pred = self._forward(self.rnet, cropped_ims, ['prob', 'conv5-2', 'conv5-3'])
         cls_scores = cls_scores[:, 1]
         keep_inds = np.where(cls_scores > self.thresh[1])[0]
         if len(keep_inds) > 0:

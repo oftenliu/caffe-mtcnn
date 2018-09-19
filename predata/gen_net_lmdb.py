@@ -147,7 +147,7 @@ def put_db(txn, dataset):
 def write_db(dbname,net, iterType,shuffling):
     dataset = []
     i = 0
-    db = lmdb.open(dbname, map_size=G16)
+    db = lmdb.open(dbname, map_size=G24)
     txn = db.begin(write=True)
     for line in iter_all_data(net, iterType):
         data_example = parse_data(line)
@@ -206,7 +206,7 @@ def gen_lmdb(filename, net, type,shuffling = True):
 def start(net):
     saveFolder = os.path.join(rootPath, "tmp/data/%s/"%(net))
 
-    for n in ['pos', 'neg', 'part', 'landmark']:
+    for n in ['pos','neg', 'part', 'landmark']:
         filename = os.path.join(saveFolder, "%sdb"%(n))
         gen_lmdb(filename, net, n)
     # Finally, write the labels file:

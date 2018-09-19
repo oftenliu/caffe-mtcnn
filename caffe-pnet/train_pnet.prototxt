@@ -1,4 +1,3 @@
-
 name: "mtcnn_pnet"
 layer {
   name: "PyData"
@@ -7,17 +6,14 @@ layer {
   top: "label"
   top: "bbox"
   top: "landmark"
-  transform_param {
-    mirror: false
-    mean_value: 127.5
-    scale: 0.0078125
-  }
-  data_param {
-    source: "train_lmdb12"
-    batch_size: 64
-    backend: LMDB
+  python_param {
+    module: "pydata_layer"
+    layer:  "MtcnnDataLayer"
+    param_str: "{\'batch_size\': 384, \'net_type\': \'pnet\'}"
   }
 }
+
+ 
 layer {
   name: "conv1"
   type: "Convolution"
@@ -41,12 +37,16 @@ layer {
     }
   }
 }
+
 layer {
-  name: "relu1"
+  name: "PReLU1"
   type: "PReLU"
   bottom: "conv1"
   top: "conv1"
 }
+
+
+
 layer {
   name: "pool1"
   type: "Pooling"
@@ -54,7 +54,7 @@ layer {
   top: "pool1"
   pooling_param {
     pool: MAX
-    kernel_size: 3
+    kernel_size: 2
     stride: 2
   }
 }
@@ -82,7 +82,7 @@ layer {
   }
 }
 layer {
-  name: "relu2"
+  name: "PReLU2"
   type: "PReLU"
   bottom: "conv2"
   top: "conv2"
@@ -114,7 +114,7 @@ layer {
   }
 }
 layer {
-  name: "relu3"
+  name: "PReLU3"
   type: "PReLU"
   bottom: "conv3"
   top: "conv3"
@@ -214,42 +214,43 @@ layer {
   propagate_down: 0 
 }
 
-#layer {
-#  name: "conv4-3"
-#  type: "Convolution"
-#  bottom: "conv3"
-#  top: "conv4-3"
-#  param {
-#    lr_mult: 1
-#    decay_mult: 1
-#  }
-#  param {
-#    lr_mult: 2
-#    decay_mult: 0
-#  }
-#  convolution_param {
-#    num_output: 10
-#    kernel_size: 1
-#    stride: 1
-#     weight_filler {
-#      type: "xavier"
-#	}
-#    bias_filler {
-#      type: "constant"
-#      value: 0
-#    }
-#  }
-#}
+layer {
+  name: "conv4-3"
+  type: "Convolution"
+  bottom: "conv3"
+  top: "conv4-3"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 10
+    kernel_size: 1
+    stride: 1
+     weight_filler {
+      type: "xavier"
+	}
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
 
-#layer {
-#  name: "landmark_loss"
-#  type: "OftenMtcnnLandMarkLoss"
-#  bottom: "conv4-3"
-#  bottom: "landmark"
-#  bottom: "label"
-#  top: "landmark_loss"
-#  loss_weight: 0.5
-#  propagate_down: 1
-#  propagate_down: 0
-#  propagate_down: 0 
-#}
+layer {
+  name: "landmark_loss"
+  type: "OftenMtcnnLandMarkLoss"
+  bottom: "conv4-3"
+  bottom: "landmark"
+  bottom: "label"
+  top: "landmark_loss"
+  loss_weight: 0.5
+  propagate_down: 1
+  propagate_down: 0
+  propagate_down: 0 
+}
+

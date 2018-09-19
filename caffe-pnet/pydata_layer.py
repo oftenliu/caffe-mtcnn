@@ -3,7 +3,7 @@ import cv2
 import lmdb
 import numpy as np
 import sys
-sys.path.append('/home/ulsee/often/caffe/python')
+sys.path.append('/home/often/often/caffe/python')
 import yaml
 import caffe
 import atexit

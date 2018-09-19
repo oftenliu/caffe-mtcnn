@@ -37,7 +37,7 @@ layer {
   top: "pool1"
   pooling_param {
     pool: MAX
-    kernel_size: 3
+    kernel_size: 2
     stride: 2
   }
 }
@@ -112,16 +112,16 @@ layer {
   }
 }
 
-layer {
-  name: "conv4-3"
-  type: "Convolution"
-  bottom: "conv3"
-  top: "conv4-3"
+#layer {
+#  name: "conv4-3"
+#  type: "Convolution"
+#  bottom: "conv3"
+#  top: "conv4-3"
 
-  convolution_param {
-    num_output: 10
-    kernel_size: 1
-    stride: 1
-  }
-}
+#  convolution_param {
+#    num_output: 10
+#    kernel_size: 1
+#    stride: 1
+#  }
+#}
 

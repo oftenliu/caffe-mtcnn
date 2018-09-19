@@ -5,12 +5,12 @@ momentum: 0.9
 weight_decay: 0.004
 # The learning rate policy
 lr_policy: "step"
-stepsize: 20000
+stepsize: 30000
 gamma: 0.1
 display: 200
-max_iter: 100000
+max_iter: 200000
 snapshot: 10000
-snapshot_prefix: "../tmp/model/rnet/train0817"
-solver_mode: CPU
+snapshot_prefix: "../tmp/model/rnet/0912"
+solver_mode: GPU
 
 
