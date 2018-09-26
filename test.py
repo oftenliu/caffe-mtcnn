@@ -1,57 +1,42 @@
 #coding:utf-8
-import tensorflow as tf
 import numpy as np
 import os
 import sys
 rootPath = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "./"))
 sys.path.insert(0, rootPath)
-from model.mtcnnmodel import mtcnn_pnet, mtcnn_rnet,mtcnn_onet
 
+
+from mtcnn_config import config
 from util.loader import TestLoader
-from detect.ronet_detect import ROnetDetect
-from detect.pnet_detect import PnetDetect
 from detect.detect import MtcnnDetector
 
 import cv2
 import argparse
 
-def test(stage, testFolder):
+def test(testFolder,stage):
     print("Start testing in %s"%(testFolder))
-    detectors = [None, None, None]
-    if stage in ['pnet', 'rnet', 'onet']:
-        modelPath = os.path.join(rootPath, 'tmp/model/pnet/')
-        a = [b[5:-6] for b in os.listdir(modelPath) if b.startswith('pnet-') and b.endswith('.index')]
-        maxEpoch = max(map(int, a)) # auto match a max epoch model
-        modelPath = os.path.join(modelPath, "pnet-%d"%(maxEpoch))
-        print("Use PNet model: %s"%(modelPath))
-        detectors[0] = PnetDetect(mtcnn_pnet,modelPath) 
-    if stage in ['rnet', 'onet']:
-        modelPath = os.path.join(rootPath, 'tmp/model/rnet/')
-        a = [b[5:-6] for b in os.listdir(modelPath) if b.startswith('rnet-') and b.endswith('.index')]
-        maxEpoch = max(map(int, a))
-        modelPath = os.path.join(modelPath, "rnet-%d"%(maxEpoch))
-        print("Use RNet model: %s"%(modelPath))
-        detectors[1] = ROnetDetect(mtcnn_rnet, 24, 1, modelPath)
-    if stage in ['onet']:
-        modelPath = os.path.join(rootPath, 'tmp/model/onet/')
-        a = [b[5:-6] for b in os.listdir(modelPath) if b.startswith('onet-') and b.endswith('.index')]
-        maxEpoch = max(map(int, a))
-        modelPath = os.path.join(modelPath, "onet-%d"%(maxEpoch))
-        print("Use ONet model: %s"%(modelPath))
-        detectors[2] = ROnetDetect(mtcnn_onet, 48, 1, modelPath)
-    mtcnnDetector = MtcnnDetector(detectors=detectors, min_face_size = 24, threshold=[0.9, 0.6, 0.7])
+    if stage in ["pnet"]:
+        net = ['caffe-pnet/pnet.prototxt', 'testmodel/p.caffemodel']
+        #net = ['pmodel/p.prototxt', 'pmodel/p.caffemodel']
+    if stage in ["rnet"]:
+        net = ['caffe-pnet/pnet.prototxt', 'testmodel/p.caffemodel', 'caffe-rnet/rnet.prototxt', 'testmodel/r.caffemodel']
+    if stage in ["onet"]:    
+        net = ['caffe-pnet/pnet.prototxt', 'testmodel/p.caffemodel', 'caffe-rnet/rnet.prototxt', 'testmodel/r.caffemodel', 'caffe-onet/onet.prototxt', 'testmodel/o.caffemodel']
 
     testImages = []
     for name in os.listdir(testFolder):
         testImages.append(os.path.join(testFolder, name))
-    testDatas = TestLoader(testImages)
-    # Now to detect
-    allBoxes, allLandmarks = mtcnnDetector.detect_face(testDatas)
+
+    mtcnn_detector = MtcnnDetector(net,min_face_size=120,stride=2,threshold=[0.6, 0.7, 0.7])
+    test_data = TestLoader(testImages)
+    # do detect
+    detections, allLandmarks = mtcnn_detector.detect_face(test_data)
+    # save detect result
     print("\n")
     # Save it
     for idx, imagePath in enumerate(testImages):
         image = cv2.imread(imagePath)
-        for bbox in allBoxes[idx]:
+        for bbox in detections[idx]:
             cv2.putText(image,str(np.round(bbox[4],2)),(int(bbox[0]),int(bbox[1])),cv2.FONT_HERSHEY_TRIPLEX,1,color=(255,0,255))
             cv2.rectangle(image, (int(bbox[0]),int(bbox[1])),(int(bbox[2]),int(bbox[3])),(0,0,255))
         allLandmark = allLandmarks[idx]
@@ -77,10 +62,10 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    stage = 'onet'
+    stage = args.stage
     if stage not in ['pnet', 'rnet', 'onet']:
         raise Exception("Please specify stage by --stage=pnet or rnet or onet")
     # Support stage: pnet, rnet, onet
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus # set GPU
-    test(stage, os.path.join(rootPath, "images"))
+    test(os.path.join(rootPath, "images"),stage)
 

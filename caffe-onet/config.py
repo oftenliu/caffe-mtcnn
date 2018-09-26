@@ -19,6 +19,6 @@ cfg.NET_INPUT_SIZE = {'pnet': 12, 'rnet': 24, 'onet': 48}
 cfg.DATA_RATIO = {
   'pnet': [3, 1, 1, 2],
   'rnet': [3, 1, 1, 2],
-  'onet': [3, 2, 1, 2],
+  'onet': [3, 1, 1, 2],
 }
 

@@ -4,13 +4,16 @@ base_lr: 0.01
 momentum: 0.9
 weight_decay: 0.004
 # The learning rate policy
-lr_policy: "step"
-stepsize: 50000
+lr_policy: "multistep"
 gamma: 0.1
-display: 400
+stepvalue: 10000
+stepvalue: 50000
+stepvalue: 90000
+stepvalue: 140000
+display: 200
 max_iter:200000
 snapshot: 10000
-snapshot_prefix: "../tmp/model/pnet"
+snapshot_prefix: "../tmp/model/pnet/0926"
 solver_mode: GPU
 
 

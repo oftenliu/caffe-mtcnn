@@ -38,21 +38,10 @@ def iter_all_data(net, iterType):
     if not os.path.isfile(os.path.join(saveFolder, 'landmark.txt')):
         raise Exception("Please gen landmark.txt in first!") 
 
-    if iterType == 'all':
-        with open(os.path.join(saveFolder, 'pos.txt'), 'r') as f:
-            pos = f.readlines()
-        with open(os.path.join(saveFolder, 'neg.txt'), 'r') as f:
-            neg = f.readlines()
-        with open(os.path.join(saveFolder, 'part.txt'), 'r') as f:
-            part = f.readlines()
-        # keep sample ratio [neg, pos, part] = [3, 1, 1]
-        base_num = min([len(neg), len(pos), len(part)])
-        if len(neg) > base_num * 3:
-            neg_keep = np.random.choice(len(neg), size=base_num * 3, replace=False)
-        else:
-            neg_keep = np.random.choice(len(neg), size=len(neg), replace=False)
-        pos_keep = np.random.choice(len(pos), size=base_num, replace=False)
-        part_keep = np.random.choice(len(part), size=base_num, replace=False)
+
+
+
+
 
 
         for i in pos_keep:
@@ -65,6 +54,7 @@ def iter_all_data(net, iterType):
             yield item
 
     if iterType in ['pos', 'neg', 'part', 'landmark']:
+
         for line in open(os.path.join(saveFolder, '%s.txt'%(iterType))):
             yield line
 

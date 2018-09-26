@@ -301,13 +301,13 @@ class MtcnnDetector(object):
         dets[:, 0:4] = np.round(dets[:, 0:4])
         [dy, edy, dx, edx, y, ey, x, ex, tmpw, tmph] = self.pad(dets, w, h)
         num_boxes = dets.shape[0]
-        cropped_ims = np.zeros((num_boxes, 48, 48, 3), dtype=np.float32)
+        cropped_ims = np.zeros((num_boxes,3, 48, 48), dtype=np.float32)
         for i in range(num_boxes):
             tmp = np.zeros((tmph[i], tmpw[i], 3), dtype=np.uint8)
             tmp[dy[i]:edy[i] + 1, dx[i]:edx[i] + 1, :] = im[y[i]:ey[i] + 1, x[i]:ex[i] + 1, :]
             cropped_ims[i, :, :, :] = (cv2.resize(tmp, (48, 48)).transpose((2, 0, 1)) - 127.5) / 128
 
-        cls_scores, reg, landmark = self._forward(self.onet, cropped_ims, ['prob', 'bbox_pred', 'landmark_pred'])
+        cls_scores, reg, landmark = self._forward(self.onet, cropped_ims, ['prob', 'conv6-2', 'conv6-3'])
 
         # prob belongs to face
         cls_scores = cls_scores[:, 1]
